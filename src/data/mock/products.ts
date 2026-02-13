@@ -1,0 +1,55 @@
+// Mock product-level summary data
+import type { ProductSummary } from '../types'
+
+export const productSummaryData: ProductSummary[] = [
+  {
+    product: 'Term Life',
+    spend: 26160,
+    conversions: 234,
+    cpa: 111.79,
+    roas: 3.4,
+    impressionShare: 66.3,
+    strength: 'strong',
+    spendShare: 36.1,
+  },
+  {
+    product: 'Disability',
+    spend: 15840,
+    conversions: 168,
+    cpa: 94.29,
+    roas: 2.9,
+    impressionShare: 63.8,
+    strength: 'opportunity',
+    spendShare: 21.9,
+  },
+  {
+    product: 'Annuities',
+    spend: 15360,
+    conversions: 92,
+    cpa: 166.96,
+    roas: 3.1,
+    impressionShare: 58.5,
+    strength: 'risk',
+    spendShare: 21.2,
+  },
+  {
+    product: 'Dental Network',
+    spend: 10440,
+    conversions: 178,
+    cpa: 58.65,
+    roas: 2.7,
+    impressionShare: 72.1,
+    strength: 'strong',
+    spendShare: 14.4,
+  },
+  {
+    product: 'Group Benefits',
+    spend: 4680,
+    conversions: 68,
+    cpa: 68.82,
+    roas: 3.2,
+    impressionShare: 61.2,
+    strength: 'opportunity',
+    spendShare: 6.5,
+  },
+]

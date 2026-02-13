@@ -1,0 +1,63 @@
+// Mock alerts and recommendations
+import type { Alert } from '../types'
+
+export const alertsData: Alert[] = [
+  {
+    id: 'alert-1',
+    severity: 'critical',
+    title: 'Term Life CPA increased 23% WoW',
+    description: 'Term Life - High Intent campaign CPA rose from $108 to $133. Top converting keywords showing increased competition. Consider reviewing bid strategy.',
+    product: 'Term Life',
+    metric: 'CPA',
+    changePercent: 23,
+    timestamp: '2026-02-12T08:00:00Z',
+  },
+  {
+    id: 'alert-2',
+    severity: 'warning',
+    title: 'Disability losing 18% IS to budget',
+    description: 'Disability - High Intent is budget constrained, losing 18.2% impression share. Estimated 14 additional conversions available with $180/day increase.',
+    product: 'Disability',
+    metric: 'Impression Share',
+    changePercent: -18.2,
+    timestamp: '2026-02-12T08:00:00Z',
+  },
+  {
+    id: 'alert-3',
+    severity: 'warning',
+    title: 'Annuities ROAS declining 3 weeks running',
+    description: 'Annuities portfolio ROAS dropped from 3.8x to 3.1x over three consecutive weeks. Retirement Planning campaign driving most of the decline.',
+    product: 'Annuities',
+    metric: 'ROAS',
+    changePercent: -18.4,
+    timestamp: '2026-02-11T08:00:00Z',
+  },
+  {
+    id: 'alert-4',
+    severity: 'success',
+    title: 'Dental Network hitting record conversions',
+    description: 'Dental campaigns delivered 156 conversions last 7 days, up 31% from prior period. CPA improved to $52, well below $70 target.',
+    product: 'Dental Network',
+    metric: 'Conversions',
+    changePercent: 31,
+    timestamp: '2026-02-12T08:00:00Z',
+  },
+  {
+    id: 'alert-5',
+    severity: 'info',
+    title: '42 new search terms discovered',
+    description: '42 new search terms appeared this week across all products. 8 classified as Winners, 12 as potential Negatives. Review recommended.',
+    metric: 'Search Terms',
+    timestamp: '2026-02-11T08:00:00Z',
+  },
+  {
+    id: 'alert-6',
+    severity: 'warning',
+    title: 'Group Benefits underspending by 22%',
+    description: 'Group Benefits budget pacing at 78% of target. $3,300 unspent MTD. Consider expanding keyword coverage or increasing bids.',
+    product: 'Group Benefits',
+    metric: 'Budget Pacing',
+    changePercent: -22,
+    timestamp: '2026-02-12T08:00:00Z',
+  },
+]
