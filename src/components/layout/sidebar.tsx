@@ -12,8 +12,11 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  LogOut,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
 interface NavItem {
   label: string
@@ -92,6 +95,7 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation()
+  const { user, signOut } = useAuth()
   const [expandedItems, setExpandedItems] = useState<string[]>(() => {
     // Auto-expand the section that contains the current route
     const current = navigation.find(
@@ -202,7 +206,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t px-6 py-3">
+      <div className="border-t px-4 py-3 space-y-2">
+        {isSupabaseConfigured && user && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-xs text-muted-foreground">
+              {user.email}
+            </p>
+            <button
+              onClick={signOut}
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
           Last sync: Feb 12, 2026 8:00 AM
         </p>

@@ -1,8 +1,10 @@
-// Updated: Phase 5 - added ErrorBoundary wrapper and 404 catch-all route
+// Updated: Phase 6 - added /login route and AuthGuard protection for dashboard routes
 import { Routes, Route } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { AuthGuard } from '@/components/layout/auth-guard'
 import { AppShell } from '@/components/layout/app-shell'
+import { LoginPage } from '@/pages/login'
 import { ExecutiveSummary } from '@/pages/executive/executive-summary'
 import { PerformanceOverview } from '@/pages/performance/performance-overview'
 import { CampaignPerformance } from '@/pages/performance/campaign-performance'
@@ -27,7 +29,8 @@ export default function App() {
     <ErrorBoundary>
       <TooltipProvider>
         <Routes>
-          <Route element={<AppShell />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<AuthGuard><AppShell /></AuthGuard>}>
             {/* Executive Summary */}
             <Route index element={<ExecutiveSummary />} />
 

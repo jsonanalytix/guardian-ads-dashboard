@@ -1,0 +1,7 @@
+# Cloudflare Pages configuration
+# Deploy: npx wrangler pages deploy dist
+# Or connect the GitHub repo to Cloudflare Pages for auto-deploy
+
+name = "guardian-ads-dashboard"
+compatibility_date = "2026-02-13"
+pages_build_output_dir = "dist"

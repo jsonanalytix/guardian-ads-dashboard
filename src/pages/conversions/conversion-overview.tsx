@@ -356,7 +356,7 @@ export function ConversionOverview() {
           </div>
 
           {/* Product summary cards below chart */}
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
             {productData.map((p) => (
               <div key={p.product} className="rounded-lg border p-3 text-center">
                 <div className="flex items-center justify-center gap-1.5">

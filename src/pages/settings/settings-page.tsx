@@ -33,6 +33,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { useTheme, type Theme } from '@/hooks/use-theme'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
 interface SettingsState {
   defaultDateRange: string
@@ -230,39 +231,79 @@ export function SettingsPage() {
           <CardDescription>Data refresh status and connection information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950">
-                <Database className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Mock Data (Phase 1-4)</p>
-                  <Badge variant="outline" className="text-xs">Current</Badge>
+          {isSupabaseConfigured ? (
+            <>
+              <div className="rounded-lg border border-emerald-300/40 bg-emerald-50/50 p-4 dark:border-emerald-500/20 dark:bg-emerald-950/20">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950">
+                    <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Supabase (Live)</p>
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300 text-xs">Connected</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Live data via Google Ads API daily extraction into Supabase tables
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Using static mock data modules with realistic Guardian insurance values
-                </p>
               </div>
-            </div>
-          </div>
 
-          <div className="rounded-lg border border-dashed p-4 opacity-60">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Shield className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Supabase (Future)</p>
-                  <Badge variant="secondary" className="text-xs">Planned</Badge>
+              <div className="rounded-lg border border-dashed p-4 opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950">
+                    <Database className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Mock Data</p>
+                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Static mock data modules — used as fallback when Supabase is not configured
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Live data via Google Ads API daily extraction into Supabase tables
-                </p>
               </div>
-            </div>
-          </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950">
+                    <Database className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Mock Data</p>
+                      <Badge variant="outline" className="text-xs">Current</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Using static mock data modules with realistic Guardian insurance values
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-dashed p-4 opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Shield className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Supabase</p>
+                      <Badge variant="secondary" className="text-xs">Not configured</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to connect live data
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 

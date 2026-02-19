@@ -1,13 +1,12 @@
-// Banner component to indicate mock/demo data is being displayed.
-// Remove this component once live Supabase data integration is complete.
 import { FlaskConical, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
 export function MockDataBanner() {
   const [dismissed, setDismissed] = useState(false)
 
-  if (dismissed) return null
+  if (isSupabaseConfigured || dismissed) return null
 
   return (
     <div className="relative flex items-center justify-center gap-2 border-b border-amber-300/40 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-950/30 dark:text-amber-200">
