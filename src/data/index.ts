@@ -646,37 +646,462 @@ export async function getPerformanceTimeSeries(
 
 // ===================================================================
 // Budget / Alerts / Top Movers / KPIs / Products / Health
-// (computed — mock-only until Step 4)
+// (computed from filtered campaign windows)
 // ===================================================================
 
-export async function getBudgetPacing(_filters?: Filters): Promise<BudgetPacing[]> {
-  const { budgetPacingData } = await import('./mock/budgets')
-  return budgetPacingData
+type CampaignTotals = {
+  spend: number
+  impressions: number
+  clicks: number
+  conversions: number
+  conversionValue: number
+  impressionShare: number
+  cpa: number
+  roas: number
+  ctr: number
 }
 
-export async function getAlerts(_filters?: Filters): Promise<Alert[]> {
-  const { alertsData } = await import('./mock/alerts')
-  return alertsData
+const PRODUCT_BUDGETS: Record<Product, number> = {
+  'Term Life': 65000,
+  'Disability': 40000,
+  'Annuities': 35000,
+  'Dental Network': 25000,
+  'Group Benefits': 15000,
 }
 
-export async function getTopMovers(_filters?: Filters): Promise<TopMover[]> {
-  const { topMoversData } = await import('./mock/top-movers')
-  return topMoversData
+const ALL_PRODUCTS = Object.keys(PRODUCT_BUDGETS) as Product[]
+
+function clamp(value: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, value))
 }
 
-export async function getKpiSummary(_filters?: Filters): Promise<KpiSummary[]> {
-  const { kpiData } = await import('./mock/kpis')
-  return kpiData
+function percentChange(current: number, previous: number): number {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return 0
+  if (previous === 0) return current === 0 ? 0 : 100
+  return ((current - previous) / previous) * 100
 }
 
-export async function getProductSummary(_filters?: Filters): Promise<ProductSummary[]> {
-  const { productSummaryData } = await import('./mock/products')
-  return productSummaryData
+function trendDirection(changePercent: number): 'up' | 'down' | 'flat' {
+  if (Math.abs(changePercent) < 0.1) return 'flat'
+  return changePercent > 0 ? 'up' : 'down'
 }
 
-export async function getAccountHealthScore(_filters?: Filters): Promise<AccountHealthScore> {
-  const { healthScoreData } = await import('./mock/health-score')
-  return healthScoreData
+function formatCompactCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+function formatInteger(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(value))
+}
+
+function aggregateCampaigns(campaigns: Campaign[]): CampaignTotals {
+  const spend = campaigns.reduce((sum, c) => sum + c.spend, 0)
+  const impressions = campaigns.reduce((sum, c) => sum + c.impressions, 0)
+  const clicks = campaigns.reduce((sum, c) => sum + c.clicks, 0)
+  const conversions = campaigns.reduce((sum, c) => sum + c.conversions, 0)
+  const conversionValue = campaigns.reduce((sum, c) => sum + c.conversionValue, 0)
+  const impressionShareWeighted = campaigns.reduce((sum, c) => sum + c.searchImpressionShare * Math.max(c.impressions, 1), 0)
+  const impressionWeight = campaigns.reduce((sum, c) => sum + Math.max(c.impressions, 1), 0)
+  const impressionShare = impressionWeight > 0 ? impressionShareWeighted / impressionWeight : 0
+
+  return {
+    spend,
+    impressions,
+    clicks,
+    conversions,
+    conversionValue,
+    impressionShare,
+    cpa: conversions > 0 ? spend / conversions : 0,
+    roas: spend > 0 ? conversionValue / spend : 0,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+  }
+}
+
+function getDateKeys(campaigns: Campaign[]): string[] {
+  return [...new Set(campaigns.map((c) => c.date))].sort((a, b) => a.localeCompare(b))
+}
+
+function buildSparkline(
+  campaigns: Campaign[],
+  metric: 'spend' | 'conversions' | 'cpa' | 'roas' | 'ctr' | 'impressionShare'
+): number[] {
+  const dateMap = new Map<string, Campaign[]>()
+  for (const c of campaigns) {
+    if (!dateMap.has(c.date)) dateMap.set(c.date, [])
+    dateMap.get(c.date)!.push(c)
+  }
+
+  return [...dateMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, rows]) => {
+      const totals = aggregateCampaigns(rows)
+      switch (metric) {
+        case 'spend': return Math.round(totals.spend * 100) / 100
+        case 'conversions': return Math.round(totals.conversions)
+        case 'cpa': return Math.round(totals.cpa * 100) / 100
+        case 'roas': return Math.round(totals.roas * 100) / 100
+        case 'ctr': return Math.round(totals.ctr * 100) / 100
+        case 'impressionShare': return Math.round(totals.impressionShare * 100) / 100
+        default: return 0
+      }
+    })
+}
+
+async function getCurrentAndPreviousCampaignWindows(filters?: Filters): Promise<{
+  current: Campaign[]
+  previous: Campaign[]
+}> {
+  const current = await getCampaignPerformance(filters)
+  const all = await getCampaignPerformance({
+    ...filters,
+    dateRange: 'custom',
+  })
+
+  const currentDates = getDateKeys(current)
+  const allDates = getDateKeys(all)
+  if (currentDates.length === 0 || allDates.length === 0) return { current, previous: [] }
+
+  const startDate = currentDates[0]!
+  const startIndex = allDates.indexOf(startDate)
+  const prevStart = Math.max(0, startIndex - currentDates.length)
+  const previousDates = allDates.slice(prevStart, startIndex)
+  const previousDateSet = new Set(previousDates)
+
+  let previous = all.filter((c) => previousDateSet.has(c.date))
+  if (previous.length === 0) {
+    const fallbackSet = new Set(currentDates.slice(0, Math.min(7, currentDates.length)))
+    previous = all.filter((c) => fallbackSet.has(c.date))
+  }
+
+  return { current, previous }
+}
+
+export async function getBudgetPacing(filters?: Filters): Promise<BudgetPacing[]> {
+  const campaigns = await getCampaignPerformance(filters)
+  const dateKeys = getDateKeys(campaigns)
+  const daysElapsed = Math.max(dateKeys.length, 1)
+
+  const latestDate = dateKeys.length > 0 ? new Date(dateKeys[dateKeys.length - 1]!) : new Date()
+  const daysInMonth = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0).getDate()
+  const daysRemaining = Math.max(daysInMonth - daysElapsed, 0)
+
+  const spendByProduct = new Map<Product, number>()
+  for (const c of campaigns) {
+    spendByProduct.set(c.product, (spendByProduct.get(c.product) ?? 0) + c.spend)
+  }
+
+  return ALL_PRODUCTS.map((product) => {
+    const monthlyBudget = PRODUCT_BUDGETS[product]
+    const mtdSpend = Math.round(spendByProduct.get(product) ?? 0)
+    const mtdTarget = Math.round((monthlyBudget / daysInMonth) * daysElapsed)
+    const dailyAvgSpend = Math.round(mtdSpend / daysElapsed)
+    const projectedSpend = Math.round(dailyAvgSpend * daysInMonth)
+    const pacingPercent = mtdTarget > 0 ? Math.round((mtdSpend / mtdTarget) * 100) : 0
+
+    return {
+      product,
+      monthlyBudget,
+      mtdSpend,
+      mtdTarget,
+      dailyAvgSpend,
+      projectedSpend,
+      pacingPercent,
+      daysRemaining,
+      daysElapsed,
+    }
+  })
+}
+
+export async function getAlerts(filters?: Filters): Promise<Alert[]> {
+  const [movers, budgets] = await Promise.all([getTopMovers(filters), getBudgetPacing(filters)])
+
+  const alerts: Alert[] = []
+  const now = new Date().toISOString()
+
+  for (const mover of movers.slice(0, 4)) {
+    const metric = mover.metric
+    const pct = mover.changePercent
+    const severity: Alert['severity'] =
+      metric === 'CPA' && pct > 15
+        ? 'critical'
+        : Math.abs(pct) > 20
+        ? metric === 'Conversions' && pct > 0
+          ? 'success'
+          : 'warning'
+        : 'info'
+
+    alerts.push({
+      id: `mover-${mover.campaignName}-${metric}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      severity,
+      title: `${mover.campaignName} ${metric} ${pct >= 0 ? 'up' : 'down'} ${Math.abs(pct).toFixed(1)}%`,
+      description: `Compared to the prior period, ${mover.campaignName} moved from ${mover.previousValue.toFixed(2)} to ${mover.currentValue.toFixed(2)} on ${metric}.`,
+      product: mover.product,
+      metric,
+      changePercent: Math.round(pct * 10) / 10,
+      timestamp: now,
+    })
+  }
+
+  const underPaced = budgets.filter((b) => b.pacingPercent < 85).sort((a, b) => a.pacingPercent - b.pacingPercent)[0]
+  if (underPaced) {
+    alerts.push({
+      id: `budget-under-${underPaced.product}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      severity: 'warning',
+      title: `${underPaced.product} under pacing at ${underPaced.pacingPercent}%`,
+      description: `${underPaced.product} is spending below pace and may miss monthly volume goals.`,
+      product: underPaced.product,
+      metric: 'Budget Pacing',
+      changePercent: underPaced.pacingPercent - 100,
+      timestamp: now,
+    })
+  }
+
+  return alerts.slice(0, 6)
+}
+
+export async function getTopMovers(filters?: Filters): Promise<TopMover[]> {
+  const { current, previous } = await getCurrentAndPreviousCampaignWindows(filters)
+  if (current.length === 0) return []
+
+  const buildByCampaign = (rows: Campaign[]) => {
+    const map = new Map<string, Campaign & { _count: number }>()
+    for (const c of rows) {
+      const existing = map.get(c.campaignName)
+      if (existing) {
+        existing.spend += c.spend
+        existing.impressions += c.impressions
+        existing.clicks += c.clicks
+        existing.conversions += c.conversions
+        existing.conversionValue += c.conversionValue
+        existing._count++
+      } else {
+        map.set(c.campaignName, { ...c, _count: 1 })
+      }
+    }
+    return map
+  }
+
+  const currentByCampaign = buildByCampaign(current)
+  const previousByCampaign = buildByCampaign(previous)
+  const names = new Set([...currentByCampaign.keys(), ...previousByCampaign.keys()])
+  const movers: TopMover[] = []
+
+  for (const campaignName of names) {
+    const curr = currentByCampaign.get(campaignName)
+    const prev = previousByCampaign.get(campaignName)
+    if (!curr) continue
+
+    const currentCtr = curr.impressions > 0 ? (curr.clicks / curr.impressions) * 100 : 0
+    const previousCtr = prev && prev.impressions > 0 ? (prev.clicks / prev.impressions) * 100 : 0
+    const currentCpa = curr.conversions > 0 ? curr.spend / curr.conversions : 0
+    const previousCpa = prev && prev.conversions > 0 ? prev.spend / prev.conversions : 0
+    const currentRoas = curr.spend > 0 ? curr.conversionValue / curr.spend : 0
+    const previousRoas = prev && prev.spend > 0 ? prev.conversionValue / prev.spend : 0
+
+    const candidates: Array<{
+      metric: TopMover['metric']
+      currentValue: number
+      previousValue: number
+      changePercent: number
+    }> = [
+      {
+        metric: 'Conversions',
+        currentValue: curr.conversions,
+        previousValue: prev?.conversions ?? 0,
+        changePercent: percentChange(curr.conversions, prev?.conversions ?? 0),
+      },
+      {
+        metric: 'CPA',
+        currentValue: currentCpa,
+        previousValue: previousCpa,
+        changePercent: percentChange(currentCpa, previousCpa),
+      },
+      {
+        metric: 'ROAS',
+        currentValue: currentRoas,
+        previousValue: previousRoas,
+        changePercent: percentChange(currentRoas, previousRoas),
+      },
+      {
+        metric: 'CTR',
+        currentValue: currentCtr,
+        previousValue: previousCtr,
+        changePercent: percentChange(currentCtr, previousCtr),
+      },
+    ]
+
+    const best = candidates.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))[0]
+    if (!best || !Number.isFinite(best.changePercent)) continue
+
+    movers.push({
+      campaignName,
+      product: curr.product,
+      metric: best.metric,
+      currentValue: Math.round(best.currentValue * 100) / 100,
+      previousValue: Math.round(best.previousValue * 100) / 100,
+      changePercent: Math.round(best.changePercent * 10) / 10,
+      direction: trendDirection(best.changePercent),
+    })
+  }
+
+  return movers
+    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+    .slice(0, 8)
+}
+
+export async function getKpiSummary(filters?: Filters): Promise<KpiSummary[]> {
+  const { current, previous } = await getCurrentAndPreviousCampaignWindows(filters)
+  const currentTotals = aggregateCampaigns(current)
+  const previousTotals = aggregateCampaigns(previous)
+
+  const kpis: Array<{
+    label: KpiSummary['label']
+    current: number
+    previous: number
+    metric: 'spend' | 'conversions' | 'cpa' | 'roas' | 'ctr' | 'impressionShare'
+    format: (v: number) => string
+  }> = [
+    {
+      label: 'Total Spend',
+      current: currentTotals.spend,
+      previous: previousTotals.spend,
+      metric: 'spend',
+      format: formatCompactCurrency,
+    },
+    {
+      label: 'Conversions',
+      current: currentTotals.conversions,
+      previous: previousTotals.conversions,
+      metric: 'conversions',
+      format: formatInteger,
+    },
+    {
+      label: 'CPA',
+      current: currentTotals.cpa,
+      previous: previousTotals.cpa,
+      metric: 'cpa',
+      format: (v) => `$${v.toFixed(2)}`,
+    },
+    {
+      label: 'ROAS',
+      current: currentTotals.roas,
+      previous: previousTotals.roas,
+      metric: 'roas',
+      format: (v) => `${v.toFixed(1)}x`,
+    },
+    {
+      label: 'CTR',
+      current: currentTotals.ctr,
+      previous: previousTotals.ctr,
+      metric: 'ctr',
+      format: (v) => `${v.toFixed(1)}%`,
+    },
+    {
+      label: 'Impression Share',
+      current: currentTotals.impressionShare,
+      previous: previousTotals.impressionShare,
+      metric: 'impressionShare',
+      format: (v) => `${v.toFixed(1)}%`,
+    },
+  ]
+
+  return kpis.map((kpi) => {
+    const changePercent = percentChange(kpi.current, kpi.previous)
+    return {
+      label: kpi.label,
+      value: Math.round(kpi.current * 100) / 100,
+      formattedValue: kpi.format(kpi.current),
+      previousValue: Math.round(kpi.previous * 100) / 100,
+      changePercent: Math.round(changePercent * 10) / 10,
+      direction: trendDirection(changePercent),
+      sparklineData: buildSparkline(current, kpi.metric),
+    }
+  })
+}
+
+export async function getProductSummary(filters?: Filters): Promise<ProductSummary[]> {
+  const campaigns = await getCampaignPerformance(filters)
+  const totalsByProduct = new Map<Product, Campaign[]>()
+
+  for (const c of campaigns) {
+    if (!totalsByProduct.has(c.product)) totalsByProduct.set(c.product, [])
+    totalsByProduct.get(c.product)!.push(c)
+  }
+
+  const totalSpend = campaigns.reduce((sum, c) => sum + c.spend, 0)
+
+  return ALL_PRODUCTS.map((product) => {
+    const rows = totalsByProduct.get(product) ?? []
+    const totals = aggregateCampaigns(rows)
+    const spendShare = totalSpend > 0 ? (totals.spend / totalSpend) * 100 : 0
+    const cpa = totals.cpa
+    const roas = totals.roas
+    const impressionShare = totals.impressionShare
+
+    let strength: ProductSummary['strength'] = 'opportunity'
+    if (roas >= 3 && cpa <= 120 && impressionShare >= 65) strength = 'strong'
+    else if (roas < 2.5 || cpa > 150 || impressionShare < 55) strength = 'risk'
+
+    return {
+      product,
+      spend: Math.round(totals.spend),
+      conversions: Math.round(totals.conversions),
+      cpa: Math.round(cpa * 100) / 100,
+      roas: Math.round(roas * 10) / 10,
+      impressionShare: Math.round(impressionShare * 10) / 10,
+      strength,
+      spendShare: Math.round(spendShare * 10) / 10,
+    }
+  }).sort((a, b) => b.spend - a.spend)
+}
+
+export async function getAccountHealthScore(filters?: Filters): Promise<AccountHealthScore> {
+  const [{ current, previous }, qualityHistory, budgets] = await Promise.all([
+    getCurrentAndPreviousCampaignWindows(filters),
+    getQualityScoreHistory(filters),
+    getBudgetPacing(filters),
+  ])
+
+  const currentTotals = aggregateCampaigns(current)
+  const previousTotals = aggregateCampaigns(previous)
+
+  const avgQuality = qualityHistory.length
+    ? qualityHistory.reduce((sum, q) => sum + q.qualityScore, 0) / qualityHistory.length
+    : 7
+  const qualityScore = clamp(Math.round(avgQuality * 10))
+  const impressionShare = clamp(Math.round(currentTotals.impressionShare))
+
+  const cpaDelta = percentChange(currentTotals.cpa, previousTotals.cpa)
+  const cpaTrend = clamp(Math.round(70 - cpaDelta))
+
+  const conversionDelta = percentChange(currentTotals.conversions, previousTotals.conversions)
+  const conversionTrend = clamp(Math.round(70 + conversionDelta))
+
+  const totalMtdSpend = budgets.reduce((sum, b) => sum + b.mtdSpend, 0)
+  const totalMtdTarget = budgets.reduce((sum, b) => sum + b.mtdTarget, 0)
+  const pacingPct = totalMtdTarget > 0 ? (totalMtdSpend / totalMtdTarget) * 100 : 100
+  const budgetPacing = clamp(Math.round(100 - Math.abs(pacingPct - 100) * 2))
+
+  const overall = Math.round(
+    (qualityScore + impressionShare + cpaTrend + budgetPacing + conversionTrend) / 5
+  )
+
+  return {
+    overall,
+    components: {
+      qualityScore,
+      impressionShare,
+      cpaTrend,
+      budgetPacing,
+      conversionTrend,
+    },
+  }
 }
 
 // ===================================================================

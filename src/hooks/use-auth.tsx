@@ -1,3 +1,4 @@
+// Fix: guard against Supabase lock-manager timeouts so auth cannot hang indefinitely.
 import {
   createContext,
   useContext,
@@ -32,6 +33,17 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+const AUTH_OP_TIMEOUT_MS = 8000
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Auth operation timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ])
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -62,20 +74,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let mounted = true
     const supabase = getSupabaseBrowserClient()
+    const failSafe = window.setTimeout(() => {
+      if (!mounted) return
+      setState((prev) => (prev.loading ? { ...prev, loading: false } : prev))
+    }, AUTH_OP_TIMEOUT_MS + 2000)
 
     async function init() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), AUTH_OP_TIMEOUT_MS)
 
-      if (!mounted) return
+        if (!mounted) return
 
-      if (session?.user) {
-        const role = await fetchRole(session.user.id)
-        if (mounted) {
-          setState({ user: session.user, session, role, loading: false })
+        if (session?.user) {
+          const role = await withTimeout(fetchRole(session.user.id), AUTH_OP_TIMEOUT_MS)
+          if (mounted) {
+            setState({ user: session.user, session, role, loading: false })
+          }
+        } else {
+          setState({ user: null, session: null, role: null, loading: false })
         }
-      } else {
+      } catch (err) {
+        if (!mounted) return
+        console.warn('Auth init failed; falling back to signed-out state:', err)
         setState({ user: null, session: null, role: null, loading: false })
       }
     }
@@ -87,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!mounted) return
       if (newSession?.user) {
-        const role = await fetchRole(newSession.user.id)
+        const role = await withTimeout(fetchRole(newSession.user.id), AUTH_OP_TIMEOUT_MS)
         if (mounted) {
           setState({
             user: newSession.user,
@@ -103,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
+      window.clearTimeout(failSafe)
       subscription.unsubscribe()
     }
   }, [fetchRole])
@@ -114,12 +137,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error: { message: 'Supabase is not configured' } as AuthError,
         }
       }
-      const supabase = getSupabaseBrowserClient()
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      return { error }
+      try {
+        const supabase = getSupabaseBrowserClient()
+        const { error } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          AUTH_OP_TIMEOUT_MS
+        )
+        return { error }
+      } catch (err) {
+        return {
+          error: {
+            name: 'AuthTimeoutError',
+            message: err instanceof Error ? err.message : 'Sign in timed out',
+          } as AuthError,
+        }
+      }
     },
     []
   )
