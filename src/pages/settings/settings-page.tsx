@@ -3,6 +3,7 @@
 // Phase 4: Date range defaults, theme toggle, metric display
 // preferences, data refresh status, and CSV export placeholder
 // Phase 5: Wired theme toggle to ThemeProvider context
+// Phase 6: Added "Custom" date range option to settings default picker
 // ============================================================
 
 import { useState } from 'react'
@@ -101,6 +102,7 @@ export function SettingsPage() {
                 <SelectItem value="30d">Last 30 Days</SelectItem>
                 <SelectItem value="90d">Last 90 Days</SelectItem>
                 <SelectItem value="ytd">Year to Date</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>

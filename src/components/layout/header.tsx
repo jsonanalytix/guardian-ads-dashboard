@@ -1,5 +1,6 @@
 // Phase 5: Added theme toggle button for dark/light/system mode
 // Phase 7: Wired date range picker to global DateRangeContext
+// Phase 8: Added "Custom" date range option to global header picker
 import { useLocation } from 'react-router-dom'
 import { Menu, Bell, Calendar, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -88,6 +89,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               <SelectItem value="30d">Last 30 days</SelectItem>
               <SelectItem value="90d">Last 90 days</SelectItem>
               <SelectItem value="ytd">Year to Date</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
         </div>
