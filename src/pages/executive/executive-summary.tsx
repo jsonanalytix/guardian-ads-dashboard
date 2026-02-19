@@ -33,21 +33,30 @@ export function ExecutiveSummary() {
   const { filters, dateRange } = useDateRange()
   const budgetRefreshToken = useBudgetRefreshToken()
 
-  const { data: kpis, loading: kpisLoading } = useAsync(() => getKpiSummary(filters), [dateRange])
+  const { data: kpis, loading: kpisLoading } = useAsync(
+    () => getKpiSummary(filters),
+    [dateRange, filters.startDate, filters.endDate]
+  )
   const { data: healthScore, loading: healthLoading } = useAsync(
     () => getAccountHealthScore(filters),
-    [dateRange, budgetRefreshToken]
+    [dateRange, filters.startDate, filters.endDate, budgetRefreshToken]
   )
   const { data: budgets, loading: budgetsLoading } = useAsync(
     () => getBudgetPacing(filters),
-    [dateRange, budgetRefreshToken]
+    [dateRange, filters.startDate, filters.endDate, budgetRefreshToken]
   )
-  const { data: movers, loading: moversLoading } = useAsync(() => getTopMovers(filters), [dateRange])
+  const { data: movers, loading: moversLoading } = useAsync(
+    () => getTopMovers(filters),
+    [dateRange, filters.startDate, filters.endDate]
+  )
   const { data: alerts, loading: alertsLoading } = useAsync(
     () => getAlerts(filters),
-    [dateRange, budgetRefreshToken]
+    [dateRange, filters.startDate, filters.endDate, budgetRefreshToken]
   )
-  const { data: products, loading: productsLoading } = useAsync(() => getProductSummary(filters), [dateRange])
+  const { data: products, loading: productsLoading } = useAsync(
+    () => getProductSummary(filters),
+    [dateRange, filters.startDate, filters.endDate]
+  )
 
   const isLoading = kpisLoading || healthLoading || budgetsLoading || moversLoading || alertsLoading || productsLoading
 

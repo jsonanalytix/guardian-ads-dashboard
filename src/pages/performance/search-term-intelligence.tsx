@@ -47,7 +47,7 @@ export function SearchTermIntelligence() {
   const { dateRange, filters: dateFilters } = useDateRange()
   const { data: termSummary, loading } = useAsync(
     () => getSearchTermSummary(dateFilters),
-    [dateRange]
+    [dateRange, dateFilters.startDate, dateFilters.endDate]
   )
   const [activeTab, setActiveTab] = useState('winners')
 

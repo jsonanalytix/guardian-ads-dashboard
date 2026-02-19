@@ -33,7 +33,14 @@ export function CampaignPerformance() {
 
   const { data: campaigns, loading } = useAsync(
     () => getCampaignPerformance(filters),
-    [dateRange, selectedProducts.join(','), selectedIntents.join(','), selectedStatuses.join(',')]
+    [
+      dateRange,
+      dateFilters.startDate,
+      dateFilters.endDate,
+      selectedProducts.join(','),
+      selectedIntents.join(','),
+      selectedStatuses.join(','),
+    ]
   )
 
   // Aggregate to latest date per campaign (or sum over period)

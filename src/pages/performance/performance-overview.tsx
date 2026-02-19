@@ -55,6 +55,7 @@ const dateRanges = [
   { key: '7d', label: '7D' },
   { key: '14d', label: '14D' },
   { key: '30d', label: '30D' },
+  { key: 'custom', label: 'Custom' },
 ] as const
 
 export function PerformanceOverview() {
@@ -63,12 +64,12 @@ export function PerformanceOverview() {
 
   const { data: timeSeries, loading: tsLoading } = useAsync(
     () => getPerformanceTimeSeries(selectedMetric, filters),
-    [selectedMetric, dateRange]
+    [selectedMetric, dateRange, filters.startDate, filters.endDate]
   )
 
   const { data: campaigns, loading: campLoading } = useAsync(
     () => getCampaignPerformance(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
 
   // Calculate summary metrics for the selected period

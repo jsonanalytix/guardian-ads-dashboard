@@ -47,6 +47,7 @@ const dateRanges = [
   { key: '7d', label: '7D' },
   { key: '14d', label: '14D' },
   { key: '30d', label: '30D' },
+  { key: 'custom', label: 'Custom' },
 ] as const
 
 export function DevicePerformancePage() {
@@ -54,11 +55,11 @@ export function DevicePerformancePage() {
 
   const { data: deviceSummary, loading: summaryLoading } = useAsync(
     () => getDeviceSummary(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
   const { data: deviceRaw, loading: rawLoading } = useAsync(
     () => getDevicePerformance(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
 
   // Aggregate by device

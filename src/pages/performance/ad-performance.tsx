@@ -73,7 +73,7 @@ export function AdPerformancePage() {
   const { dateRange, filters: dateFilters } = useDateRange()
   const { data: allAds, loading: allLoading } = useAsync(
     () => getAdPerformance(dateFilters),
-    [dateRange]
+    [dateRange, dateFilters.startDate, dateFilters.endDate]
   )
 
   // Aggregated ad performance (sum across 30 days per ad group)

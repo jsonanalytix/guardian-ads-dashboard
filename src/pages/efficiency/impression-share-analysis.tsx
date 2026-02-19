@@ -42,6 +42,7 @@ const dateRanges = [
   { key: '7d', label: '7D' },
   { key: '14d', label: '14D' },
   { key: '30d', label: '30D' },
+  { key: 'custom', label: 'Custom' },
 ] as const
 
 export function ImpressionShareAnalysis() {
@@ -49,7 +50,7 @@ export function ImpressionShareAnalysis() {
 
   const { data: campaigns, loading } = useAsync(
     () => getCampaignPerformance(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
 
   // Aggregate IS data by campaign (latest date)

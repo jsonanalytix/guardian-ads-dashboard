@@ -1,11 +1,14 @@
 // Phase 5: Added theme toggle button for dark/light/system mode
 // Phase 7: Wired date range picker to global DateRangeContext
 // Phase 8: Added "Custom" date range option to global header picker
+// Phase 9: Implemented custom start/end date controls and apply behavior
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Menu, Bell, Calendar, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { useTheme, type Theme } from '@/hooks/use-theme'
 import { useDateRange, type DateRangeKey } from '@/hooks/use-date-range'
 import {
@@ -46,7 +49,14 @@ export function Header({ onMenuClick }: HeaderProps) {
   const location = useLocation()
   const title = routeTitles[location.pathname] || 'Dashboard'
   const { theme, setTheme } = useTheme()
-  const { dateRange, setDateRange } = useDateRange()
+  const { dateRange, setDateRange, customStartDate, customEndDate, setCustomDateRange } = useDateRange()
+  const [draftStartDate, setDraftStartDate] = useState(customStartDate)
+  const [draftEndDate, setDraftEndDate] = useState(customEndDate)
+
+  useEffect(() => {
+    setDraftStartDate(customStartDate)
+    setDraftEndDate(customEndDate)
+  }, [customStartDate, customEndDate])
 
   const cycleTheme = () => {
     const currentIndex = themeOrder.indexOf(theme)
@@ -93,6 +103,37 @@ export function Header({ onMenuClick }: HeaderProps) {
             </SelectContent>
           </Select>
         </div>
+
+        {dateRange === 'custom' && (
+          <div className="hidden items-center gap-2 md:flex">
+            <Input
+              type="date"
+              value={draftStartDate}
+              onChange={(e) => setDraftStartDate(e.target.value)}
+              className="h-9 w-[140px]"
+              max={draftEndDate || undefined}
+              aria-label="Custom start date"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              value={draftEndDate}
+              onChange={(e) => setDraftEndDate(e.target.value)}
+              className="h-9 w-[140px]"
+              min={draftStartDate || undefined}
+              aria-label="Custom end date"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9"
+              onClick={() => setCustomDateRange(draftStartDate, draftEndDate)}
+              disabled={!draftStartDate || !draftEndDate}
+            >
+              Apply
+            </Button>
+          </div>
+        )}
 
         <Separator orientation="vertical" className="hidden h-6 sm:block" />
 

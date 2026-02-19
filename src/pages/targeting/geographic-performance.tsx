@@ -35,6 +35,7 @@ const dateRanges = [
   { key: '7d', label: '7D' },
   { key: '14d', label: '14D' },
   { key: '30d', label: '30D' },
+  { key: 'custom', label: 'Custom' },
 ] as const
 
 function isStateLikeCode(code: string): boolean {
@@ -55,7 +56,7 @@ export function GeographicPerformance() {
 
   const { data: geoData, loading } = useAsync(
     () => getGeoSummary(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
 
   // Sort by spend for the main table

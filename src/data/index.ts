@@ -248,7 +248,21 @@ function toLandingPage(row: Record<string, unknown>): LandingPage {
  * Uses a hardcoded reference date that matches the mock data window.
  */
 function filterByDateRange<T extends { date: string }>(data: T[], filters?: Filters): T[] {
-  if (!filters?.dateRange || filters.dateRange === 'custom') return data
+  if (!filters?.dateRange) return data
+  if (filters.dateRange === 'custom') {
+    const startDate = filters.startDate
+    const endDate = filters.endDate
+    if (!startDate && !endDate) return data
+
+    const rangeStart = startDate && endDate && startDate > endDate ? endDate : startDate
+    const rangeEnd = startDate && endDate && startDate > endDate ? startDate : endDate
+
+    return data.filter((d) => {
+      if (rangeStart && d.date < rangeStart) return false
+      if (rangeEnd && d.date > rangeEnd) return false
+      return true
+    })
+  }
   const now = new Date('2026-02-12')
   let daysBack = 30
   switch (filters.dateRange) {
@@ -268,9 +282,17 @@ function filterByDateRange<T extends { date: string }>(data: T[], filters?: Filt
   return data.filter((d) => d.date >= cutoffStr)
 }
 
-/** Returns a YYYY-MM-DD cutoff string for Supabase .gte() queries. */
-function getDateCutoff(filters?: Filters): string | null {
-  if (!filters?.dateRange || filters.dateRange === 'custom') return null
+function getDateFilterRange(filters?: Filters): { cutoff: string | null; startDate?: string; endDate?: string } {
+  if (!filters?.dateRange) return { cutoff: null }
+  if (filters.dateRange === 'custom') {
+    const startDate = filters.startDate
+    const endDate = filters.endDate
+    if (startDate && endDate && startDate > endDate) {
+      return { cutoff: null, startDate: endDate, endDate: startDate }
+    }
+    return { cutoff: null, startDate, endDate }
+  }
+
   const now = new Date()
   let daysBack = 30
   switch (filters.dateRange) {
@@ -286,7 +308,18 @@ function getDateCutoff(filters?: Filters): string | null {
   }
   const cutoff = new Date(now)
   cutoff.setDate(cutoff.getDate() - daysBack)
-  return cutoff.toISOString().split('T')[0]!
+  return { cutoff: cutoff.toISOString().split('T')[0]! }
+}
+
+function applyDateRangeToQuery<T extends { gte: (column: string, value: string) => T; lte: (column: string, value: string) => T }>(
+  query: T,
+  filters?: Filters
+): T {
+  const { cutoff, startDate, endDate } = getDateFilterRange(filters)
+  if (startDate) query = query.gte('date', startDate)
+  else if (cutoff) query = query.gte('date', cutoff)
+  if (endDate) query = query.lte('date', endDate)
+  return query
 }
 
 // ---------------------------------------------------------------------------
@@ -333,8 +366,7 @@ export async function getCampaignPerformance(filters?: Filters): Promise<Campaig
 
   let query = sb().from('campaigns').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
   if (filters?.products?.length) query = query.in('product', filters.products)
   if (filters?.intentBuckets?.length) query = query.in('intent_bucket', filters.intentBuckets)
   if (filters?.campaignStatus?.length) {
@@ -387,8 +419,7 @@ export async function getKeywordPerformance(filters?: Filters): Promise<Keyword[
 
   let query = sb().from('keywords').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -429,8 +460,7 @@ export async function getKeywordSummaryByDate(filters?: Filters): Promise<Keywor
   let query = sb()
     .from('keywords')
     .select('*')
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
 
@@ -472,8 +502,7 @@ export async function getSearchTermReport(filters?: Filters): Promise<SearchTerm
 
   let query = sb().from('search_terms').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -514,8 +543,7 @@ export async function getSearchTermSummary(filters?: Filters): Promise<{
   let query = sb()
     .from('search_terms')
     .select('*')
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
 
@@ -583,8 +611,7 @@ export async function getAdPerformance(filters?: Filters): Promise<Ad[]> {
 
   let query = sb().from('ads').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1161,8 +1188,7 @@ export async function getQualityScoreHistory(filters?: Filters): Promise<Quality
 
   let query = sb().from('quality_score_snapshots').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1209,8 +1235,7 @@ export async function getGeoPerformance(filters?: Filters): Promise<GeoPerforman
 
   let query = sb().from('geo_performance').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1257,8 +1282,7 @@ export async function getDevicePerformance(filters?: Filters): Promise<DevicePer
 
   let query = sb().from('device_performance').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1305,8 +1329,7 @@ export async function getHourlyPerformance(filters?: Filters): Promise<HourlyPer
 
   let query = sb().from('hourly_performance').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1360,8 +1383,7 @@ export async function getAuctionInsights(filters?: Filters): Promise<AuctionInsi
 
   let query = sb().from('auction_insights').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
@@ -1452,8 +1474,7 @@ export async function getConversionActions(filters?: Filters): Promise<Conversio
 
   let query = sb().from('conversion_actions').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
   if (filters?.products?.length) query = query.in('product', filters.products)
 
   const { data, error } = await query.limit(50000)
@@ -1527,8 +1548,7 @@ export async function getLandingPages(filters?: Filters): Promise<LandingPage[]>
 
   let query = sb().from('landing_pages').select('*')
 
-  const cutoff = getDateCutoff(filters)
-  if (cutoff) query = query.gte('date', cutoff)
+  query = applyDateRangeToQuery(query, filters)
 
   const { data, error } = await query.limit(50000)
   if (error) throw error

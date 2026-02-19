@@ -34,11 +34,11 @@ export function WastedSpendAnalyzer() {
 
   const { data: keywords, loading: kwLoading } = useAsync(
     () => getKeywordPerformance(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
   const { data: searchTerms, loading: stLoading } = useAsync(
     () => getSearchTermReport(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
   const { data: qsLatest, loading: qsLoading } = useAsync(
     () => getQualityScoreLatest(),
@@ -274,6 +274,7 @@ export function WastedSpendAnalyzer() {
             <TabsTrigger value="7d">7D</TabsTrigger>
             <TabsTrigger value="14d">14D</TabsTrigger>
             <TabsTrigger value="30d">30D</TabsTrigger>
+            <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

@@ -41,12 +41,12 @@ export function DayHourAnalysis() {
 
   const { data: heatmapData, loading: heatmapLoading } = useAsync(
     () => getHourlyHeatmapData(heatmapMetric, filters),
-    [heatmapMetric, dateRange]
+    [heatmapMetric, dateRange, filters.startDate, filters.endDate]
   )
 
   const { data: hourlyRaw, loading: rawLoading } = useAsync(
     () => getHourlyPerformance(filters),
-    [dateRange]
+    [dateRange, filters.startDate, filters.endDate]
   )
 
   // Build the 7x24 heatmap grid
@@ -230,6 +230,7 @@ export function DayHourAnalysis() {
             <TabsTrigger value="7d">7D</TabsTrigger>
             <TabsTrigger value="14d">14D</TabsTrigger>
             <TabsTrigger value="30d">30D</TabsTrigger>
+            <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

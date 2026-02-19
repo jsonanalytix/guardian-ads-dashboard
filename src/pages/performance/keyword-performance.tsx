@@ -37,7 +37,7 @@ export function KeywordPerformance() {
   const { dateRange, filters: dateFilters } = useDateRange()
   const { data: keywords, loading } = useAsync(
     () => getKeywordSummaryByDate(dateFilters),
-    [dateRange]
+    [dateRange, dateFilters.startDate, dateFilters.endDate]
   )
 
   // Quality Score distribution
