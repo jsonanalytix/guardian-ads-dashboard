@@ -6,8 +6,9 @@
 
 import { useState, useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getPerformanceTimeSeries, getCampaignPerformance } from '@/data'
-import type { Filters, MultiSeriesPoint } from '@/data/types'
+import type { MultiSeriesPoint } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -58,9 +59,7 @@ const dateRanges = [
 
 export function PerformanceOverview() {
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('spend')
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d'>('30d')
-
-  const filters: Filters = { dateRange }
+  const { dateRange, setDateRange, filters } = useDateRange()
 
   const { data: timeSeries, loading: tsLoading } = useAsync(
     () => getPerformanceTimeSeries(selectedMetric, filters),

@@ -3,9 +3,12 @@
 // Landing page for leadership - everything at a glance.
 // Includes: Health Score, KPI Hero Cards, Budget Pacing,
 // Top Movers, Alerts & Recommendations, Product Donut
+// Phase 7: Connected to global DateRangeContext so the header
+// date picker drives data refreshes.
 // ============================================================
 
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import {
   getKpiSummary,
   getAccountHealthScore,
@@ -25,12 +28,14 @@ import { ProductDonut } from '@/components/charts/product-donut'
 const inverseMetrics = new Set(['CPA'])
 
 export function ExecutiveSummary() {
-  const { data: kpis, loading: kpisLoading } = useAsync(() => getKpiSummary(), [])
-  const { data: healthScore, loading: healthLoading } = useAsync(() => getAccountHealthScore(), [])
-  const { data: budgets, loading: budgetsLoading } = useAsync(() => getBudgetPacing(), [])
-  const { data: movers, loading: moversLoading } = useAsync(() => getTopMovers(), [])
-  const { data: alerts, loading: alertsLoading } = useAsync(() => getAlerts(), [])
-  const { data: products, loading: productsLoading } = useAsync(() => getProductSummary(), [])
+  const { filters, dateRange } = useDateRange()
+
+  const { data: kpis, loading: kpisLoading } = useAsync(() => getKpiSummary(filters), [dateRange])
+  const { data: healthScore, loading: healthLoading } = useAsync(() => getAccountHealthScore(filters), [dateRange])
+  const { data: budgets, loading: budgetsLoading } = useAsync(() => getBudgetPacing(filters), [dateRange])
+  const { data: movers, loading: moversLoading } = useAsync(() => getTopMovers(filters), [dateRange])
+  const { data: alerts, loading: alertsLoading } = useAsync(() => getAlerts(filters), [dateRange])
+  const { data: products, loading: productsLoading } = useAsync(() => getProductSummary(filters), [dateRange])
 
   const isLoading = kpisLoading || healthLoading || budgetsLoading || moversLoading || alertsLoading || productsLoading
 

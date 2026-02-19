@@ -1,10 +1,12 @@
 // Phase 5: Added theme toggle button for dark/light/system mode
+// Phase 7: Wired date range picker to global DateRangeContext
 import { useLocation } from 'react-router-dom'
 import { Menu, Bell, Calendar, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useTheme, type Theme } from '@/hooks/use-theme'
+import { useDateRange, type DateRangeKey } from '@/hooks/use-date-range'
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +45,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const location = useLocation()
   const title = routeTitles[location.pathname] || 'Dashboard'
   const { theme, setTheme } = useTheme()
+  const { dateRange, setDateRange } = useDateRange()
 
   const cycleTheme = () => {
     const currentIndex = themeOrder.indexOf(theme)
@@ -75,7 +78,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Date range selector */}
         <div className="hidden items-center gap-2 sm:flex">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select defaultValue="30d">
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRangeKey)}>
             <SelectTrigger className="h-9 w-[130px]">
               <SelectValue />
             </SelectTrigger>

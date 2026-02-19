@@ -7,8 +7,8 @@
 
 import { useState, useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getHourlyHeatmapData, getHourlyPerformance } from '@/data'
-import type { Filters } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -36,9 +36,8 @@ function formatHour(hour: number): string {
 }
 
 export function DayHourAnalysis() {
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d'>('30d')
+  const { dateRange, setDateRange, filters } = useDateRange()
   const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetric>('conversions')
-  const filters: Filters = { dateRange }
 
   const { data: heatmapData, loading: heatmapLoading } = useAsync(
     () => getHourlyHeatmapData(heatmapMetric, filters),

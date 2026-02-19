@@ -649,32 +649,32 @@ export async function getPerformanceTimeSeries(
 // (computed — mock-only until Step 4)
 // ===================================================================
 
-export async function getBudgetPacing(): Promise<BudgetPacing[]> {
+export async function getBudgetPacing(_filters?: Filters): Promise<BudgetPacing[]> {
   const { budgetPacingData } = await import('./mock/budgets')
   return budgetPacingData
 }
 
-export async function getAlerts(): Promise<Alert[]> {
+export async function getAlerts(_filters?: Filters): Promise<Alert[]> {
   const { alertsData } = await import('./mock/alerts')
   return alertsData
 }
 
-export async function getTopMovers(): Promise<TopMover[]> {
+export async function getTopMovers(_filters?: Filters): Promise<TopMover[]> {
   const { topMoversData } = await import('./mock/top-movers')
   return topMoversData
 }
 
-export async function getKpiSummary(): Promise<KpiSummary[]> {
+export async function getKpiSummary(_filters?: Filters): Promise<KpiSummary[]> {
   const { kpiData } = await import('./mock/kpis')
   return kpiData
 }
 
-export async function getProductSummary(): Promise<ProductSummary[]> {
+export async function getProductSummary(_filters?: Filters): Promise<ProductSummary[]> {
   const { productSummaryData } = await import('./mock/products')
   return productSummaryData
 }
 
-export async function getAccountHealthScore(): Promise<AccountHealthScore> {
+export async function getAccountHealthScore(_filters?: Filters): Promise<AccountHealthScore> {
   const { healthScoreData } = await import('./mock/health-score')
   return healthScoreData
 }

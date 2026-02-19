@@ -4,10 +4,11 @@
 // negative keyword gaps, estimated savings, poor QS keyword costs
 // ============================================================
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getKeywordPerformance, getSearchTermReport, getQualityScoreLatest } from '@/data'
-import type { Keyword, SearchTerm, QualityScoreSnapshot, Filters } from '@/data/types'
+import type { Keyword, SearchTerm, QualityScoreSnapshot } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,8 +30,7 @@ import { formatCurrency, formatCurrencyDetailed, formatNumber } from '@/lib/util
 import { Trash2, AlertTriangle, DollarSign, TrendingDown, Ban } from 'lucide-react'
 
 export function WastedSpendAnalyzer() {
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d'>('30d')
-  const filters: Filters = { dateRange }
+  const { dateRange, setDateRange, filters } = useDateRange()
 
   const { data: keywords, loading: kwLoading } = useAsync(
     () => getKeywordPerformance(filters),

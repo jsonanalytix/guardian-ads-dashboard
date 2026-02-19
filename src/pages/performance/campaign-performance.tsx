@@ -6,8 +6,9 @@
 
 import { useState, useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getCampaignPerformance } from '@/data'
-import type { Campaign, Filters, Product, IntentBucket, CampaignStatus } from '@/data/types'
+import type { Campaign, Product, IntentBucket, CampaignStatus } from '@/data/types'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable, MetricCell, StatusBadge } from '@/components/tables/data-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,12 +19,13 @@ const intents: IntentBucket[] = ['Brand', 'High Intent', 'Mid Intent', 'Low Inte
 const statuses: CampaignStatus[] = ['Enabled', 'Paused']
 
 export function CampaignPerformance() {
+  const { dateRange, filters: dateFilters } = useDateRange()
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
   const [selectedIntents, setSelectedIntents] = useState<IntentBucket[]>([])
   const [selectedStatuses, setSelectedStatuses] = useState<CampaignStatus[]>([])
 
-  const filters: Filters = {
-    dateRange: '30d',
+  const filters = {
+    ...dateFilters,
     products: selectedProducts.length ? selectedProducts : undefined,
     intentBuckets: selectedIntents.length ? selectedIntents : undefined,
     campaignStatus: selectedStatuses.length ? selectedStatuses : undefined,
@@ -31,7 +33,7 @@ export function CampaignPerformance() {
 
   const { data: campaigns, loading } = useAsync(
     () => getCampaignPerformance(filters),
-    [selectedProducts.join(','), selectedIntents.join(','), selectedStatuses.join(',')]
+    [dateRange, selectedProducts.join(','), selectedIntents.join(','), selectedStatuses.join(',')]
   )
 
   // Aggregate to latest date per campaign (or sum over period)

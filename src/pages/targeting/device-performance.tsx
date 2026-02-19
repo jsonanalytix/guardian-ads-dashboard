@@ -5,10 +5,11 @@
 // device bid adjustment recommendations
 // ============================================================
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getDeviceSummary, getDevicePerformance } from '@/data'
-import type { DevicePerformance as DevicePerf, Device, Filters, Product } from '@/data/types'
+import type { DevicePerformance as DevicePerf, Device, Product } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -49,8 +50,7 @@ const dateRanges = [
 ] as const
 
 export function DevicePerformancePage() {
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d'>('30d')
-  const filters: Filters = { dateRange }
+  const { dateRange, setDateRange, filters } = useDateRange()
 
   const { data: deviceSummary, loading: summaryLoading } = useAsync(
     () => getDeviceSummary(filters),

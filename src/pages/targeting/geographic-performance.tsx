@@ -6,8 +6,9 @@
 
 import { useState, useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getGeoSummary } from '@/data'
-import type { GeoPerformance, Filters } from '@/data/types'
+import type { GeoPerformance } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DataTable, MetricCell } from '@/components/tables/data-table'
@@ -37,9 +38,8 @@ const dateRanges = [
 ] as const
 
 export function GeographicPerformance() {
-  const [dateRange, setDateRange] = useState<'7d' | '14d' | '30d'>('30d')
+  const { dateRange, setDateRange, filters } = useDateRange()
   const [heatmapMetric, setHeatmapMetric] = useState<'conversions' | 'cpa' | 'spend' | 'roas'>('conversions')
-  const filters: Filters = { dateRange }
 
   const { data: geoData, loading } = useAsync(
     () => getGeoSummary(filters),
