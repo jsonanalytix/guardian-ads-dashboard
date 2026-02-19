@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { ProductSummary } from '@/data/types'
 
 interface ProductDonutProps {
@@ -28,6 +29,12 @@ const strengthLabels: Record<string, string> = {
   strong: 'Strong',
   opportunity: 'Opportunity',
   risk: 'Risk',
+}
+
+const strengthTooltips: Record<string, string> = {
+  strong: 'This product is performing well on efficiency metrics (CPA and ROAS).',
+  opportunity: 'This product has room for improvement on efficiency.',
+  risk: 'This product has poor efficiency and may need attention.',
 }
 
 interface CustomTooltipProps {
@@ -58,7 +65,13 @@ export function ProductDonut({ products }: ProductDonutProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Product Performance</CardTitle>
+        <CardTitle className="text-base flex items-center gap-1.5">
+          Product Performance
+          <InfoTooltip
+            content="Spend distribution across product lines. Each product's share (%) and efficiency rating are shown. Hover the chart segments for spend, conversions, CPA, and ROAS details."
+            side="right"
+          />
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-4">
@@ -91,7 +104,14 @@ export function ProductDonut({ products }: ProductDonutProps) {
             {/* Center label */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-lg font-bold">{formatCurrency(totalSpend)}</span>
-              <span className="text-[10px] text-muted-foreground">MTD Spend</span>
+              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                MTD Spend
+                <InfoTooltip
+                  content="Total month-to-date spend across all product lines."
+                  side="bottom"
+                  iconClassName="h-2.5 w-2.5"
+                />
+              </span>
             </div>
           </div>
 
@@ -104,8 +124,13 @@ export function ProductDonut({ products }: ProductDonutProps) {
                   style={{ backgroundColor: COLORS[product.product] }}
                 />
                 <span className="text-xs flex-1">{product.product}</span>
-                <span className={cn('text-[10px] font-medium', strengthColors[product.strength])}>
+                <span className={cn('text-[10px] font-medium flex items-center gap-0.5', strengthColors[product.strength])}>
                   {strengthLabels[product.strength]}
+                  <InfoTooltip
+                    content={strengthTooltips[product.strength]}
+                    side="left"
+                    iconClassName="h-2.5 w-2.5"
+                  />
                 </span>
                 <span className="text-xs text-muted-foreground w-12 text-right">
                   {product.spendShare.toFixed(1)}%

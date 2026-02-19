@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Info,
 } from 'lucide-react'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { Alert, AlertSeverity } from '@/data/types'
 
 interface AlertsCardProps {
@@ -50,7 +51,13 @@ export function AlertsCard({ alerts }: AlertsCardProps) {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Alerts & Recommendations</CardTitle>
+          <CardTitle className="text-base flex items-center gap-1.5">
+            Alerts & Recommendations
+            <InfoTooltip
+              content="Auto-generated from top movers and budget pacing. CPA increase > 15% = Critical. Metric change > 20% = Warning (or Success for rising conversions). Products pacing below 85% of target trigger a Warning."
+              side="right"
+            />
+          </CardTitle>
           <Badge variant="outline" className="text-xs">
             {alerts.length} active
           </Badge>

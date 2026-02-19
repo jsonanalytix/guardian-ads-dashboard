@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { BudgetPacing } from '@/data/types'
 
 interface BudgetPacingCardProps {
@@ -32,9 +33,21 @@ export function BudgetPacingCard({ budgets }: BudgetPacingCardProps) {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Budget Pacing</CardTitle>
+          <CardTitle className="text-base flex items-center gap-1.5">
+            Budget Pacing
+            <InfoTooltip
+              content="Compares month-to-date spend against a prorated daily target. Target = (monthly budget / days in month) x days elapsed. On Track = 95-105%, Slightly Under = 85-94%, Under Pacing < 85%, Over Pacing > 105%."
+              side="right"
+            />
+          </CardTitle>
           <div className="text-right">
-            <p className="text-xs text-muted-foreground">MTD Total</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
+              MTD Total
+              <InfoTooltip
+                content="Month-to-date spend across all products vs. the combined monthly budget."
+                side="left"
+              />
+            </p>
             <p className="text-sm font-bold">
               {formatCurrency(totalMtdSpend)}{' '}
               <span className="text-xs font-normal text-muted-foreground">
@@ -49,8 +62,12 @@ export function BudgetPacingCard({ budgets }: BudgetPacingCardProps) {
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-medium">Overall</span>
-            <span className={cn('text-xs font-semibold', overallPacing >= 85 && overallPacing <= 105 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
+            <span className={cn('text-xs font-semibold flex items-center gap-1', overallPacing >= 85 && overallPacing <= 105 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
               {overallPacing}% of target
+              <InfoTooltip
+                content="MTD spend / MTD prorated target across all products."
+                side="left"
+              />
             </span>
           </div>
           <Progress

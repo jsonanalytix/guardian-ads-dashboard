@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown } from 'lucide-react'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { TopMover } from '@/data/types'
 
 interface TopMoversCardProps {
@@ -41,7 +42,13 @@ export function TopMoversCard({ movers }: TopMoversCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Top Movers (WoW)</CardTitle>
+        <CardTitle className="text-base flex items-center gap-1.5">
+          Top Movers (WoW)
+          <InfoTooltip
+            content="Campaigns with the largest metric swings vs. the prior period. For each campaign, the metric with the biggest absolute % change is shown (Conversions, CPA, ROAS, or CTR). Top 8 movers are displayed."
+            side="right"
+          />
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

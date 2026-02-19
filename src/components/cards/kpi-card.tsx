@@ -3,7 +3,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { KpiSummary, TrendDirection } from '@/data/types'
+
+const kpiTooltips: Record<string, string> = {
+  'TOTAL SPEND': 'Sum of all campaign spend in the selected date range.',
+  CONVERSIONS: 'Total conversions across all campaigns in the selected period.',
+  CPA: 'Cost Per Acquisition: total spend / total conversions. Lower is better.',
+  ROAS: 'Return on Ad Spend: total conversion value / total spend. Higher is better.',
+  CTR: 'Click-Through Rate: (clicks / impressions) as a percentage.',
+  'IMPRESSION SHARE': 'Impression-weighted average of search impression share across campaigns. Indicates how often your ads appeared vs. total eligible impressions.',
+}
 
 interface KpiCardProps {
   kpi: KpiSummary
@@ -45,8 +55,11 @@ export function KpiCard({ kpi, inverseColor = false }: KpiCardProps) {
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
               {kpi.label}
+              {kpiTooltips[kpi.label] && (
+                <InfoTooltip content={kpiTooltips[kpi.label]} side="bottom" />
+              )}
             </p>
             <p className="text-2xl font-bold tracking-tight">{kpi.formattedValue}</p>
           </div>
@@ -85,8 +98,12 @@ export function KpiCard({ kpi, inverseColor = false }: KpiCardProps) {
           </ResponsiveContainer>
         </div>
 
-        <p className="mt-1 text-[11px] text-muted-foreground">
+        <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
           vs prior period
+          <InfoTooltip
+            content="Percentage change compared to the same-length period immediately before the selected date range."
+            side="bottom"
+          />
         </p>
       </CardContent>
     </Card>

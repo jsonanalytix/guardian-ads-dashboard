@@ -1,6 +1,7 @@
 // Account Health Score - composite 0-100 gauge
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { AccountHealthScore } from '@/data/types'
 
 interface HealthScoreCardProps {
@@ -71,11 +72,25 @@ const componentLabels: Record<string, string> = {
   conversionTrend: 'Conv. Trend',
 }
 
+const componentTooltips: Record<string, string> = {
+  qualityScore: 'Average Google Ads quality score (1-10) scaled to 0-100. Based on ad relevance, expected CTR, and landing page experience.',
+  impressionShare: 'Current period impression-weighted search impression share, mapped directly to a 0-100 score.',
+  cpaTrend: 'Score = 70 minus CPA % change. CPA going down improves the score; CPA rising lowers it.',
+  budgetPacing: 'Score = 100 minus 2x the deviation from target pacing. Perfect pacing (100%) scores 100; 10% off-pace scores 80.',
+  conversionTrend: 'Score = 70 plus conversion % change. Growing conversions raise the score; declining conversions lower it.',
+}
+
 export function HealthScoreCard({ score }: HealthScoreCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Account Health</CardTitle>
+        <CardTitle className="text-base flex items-center gap-1.5">
+          Account Health
+          <InfoTooltip
+            content="Composite score (0-100) averaging 5 components: Quality Score, Impression Share, CPA Trend, Budget Pacing, and Conversion Trend. 80+ = Excellent, 70-79 = Good, 60-69 = Fair, below 60 = Needs Attention."
+            side="right"
+          />
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-4">
@@ -85,8 +100,11 @@ export function HealthScoreCard({ score }: HealthScoreCardProps) {
           <div className="w-full space-y-2">
             {Object.entries(score.components).map(([key, value]) => (
               <div key={key} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-28 shrink-0">
+                <span className="text-xs text-muted-foreground w-28 shrink-0 flex items-center gap-1">
                   {componentLabels[key] || key}
+                  {componentTooltips[key] && (
+                    <InfoTooltip content={componentTooltips[key]} side="right" />
+                  )}
                 </span>
                 <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                   <div
