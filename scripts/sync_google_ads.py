@@ -38,6 +38,9 @@ except ImportError:
     pass
 
 log = logging.getLogger("guardian_etl")
+# Fix note (2026-02-19):
+# Geographic sync now uses regional geo target IDs and resolves them
+# to human-readable state names/codes, replacing country-level IDs.
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -192,6 +195,60 @@ _DOW_MAP = {
     "SUNDAY": "Sunday",
 }
 
+_US_STATE_CODE_BY_NAME = {
+    "Alabama": "AL",
+    "Alaska": "AK",
+    "Arizona": "AZ",
+    "Arkansas": "AR",
+    "California": "CA",
+    "Colorado": "CO",
+    "Connecticut": "CT",
+    "Delaware": "DE",
+    "District of Columbia": "DC",
+    "Florida": "FL",
+    "Georgia": "GA",
+    "Hawaii": "HI",
+    "Idaho": "ID",
+    "Illinois": "IL",
+    "Indiana": "IN",
+    "Iowa": "IA",
+    "Kansas": "KS",
+    "Kentucky": "KY",
+    "Louisiana": "LA",
+    "Maine": "ME",
+    "Maryland": "MD",
+    "Massachusetts": "MA",
+    "Michigan": "MI",
+    "Minnesota": "MN",
+    "Mississippi": "MS",
+    "Missouri": "MO",
+    "Montana": "MT",
+    "Nebraska": "NE",
+    "Nevada": "NV",
+    "New Hampshire": "NH",
+    "New Jersey": "NJ",
+    "New Mexico": "NM",
+    "New York": "NY",
+    "North Carolina": "NC",
+    "North Dakota": "ND",
+    "Ohio": "OH",
+    "Oklahoma": "OK",
+    "Oregon": "OR",
+    "Pennsylvania": "PA",
+    "Rhode Island": "RI",
+    "South Carolina": "SC",
+    "South Dakota": "SD",
+    "Tennessee": "TN",
+    "Texas": "TX",
+    "Utah": "UT",
+    "Vermont": "VT",
+    "Virginia": "VA",
+    "Washington": "WA",
+    "West Virginia": "WV",
+    "Wisconsin": "WI",
+    "Wyoming": "WY",
+}
+
 
 def _lookup(table: dict, val: Any, fallback: str = "") -> str:
     return table.get(_ename(val), fallback)
@@ -270,6 +327,7 @@ GAQL["ads"] = """
 GAQL["geo_performance"] = """
     SELECT
         campaign.id,
+        segments.geo_target_region,
         geographic_view.country_criterion_id,
         geographic_view.location_type,
         metrics.cost_micros, metrics.impressions, metrics.clicks,
@@ -521,16 +579,20 @@ def _xf_geo_performance(rows: list) -> list[dict]:
         spend = _micros(r.metrics.cost_micros)
         convs = float(r.metrics.conversions)
         clicks = int(r.metrics.clicks)
-        criterion_id = str(r.geographic_view.country_criterion_id)
-        location_type = _ename(r.geographic_view.location_type)
+        region_resource = str(r.segments.geo_target_region or "")
+        criterion_id = (
+            region_resource.split("/")[-1]
+            if region_resource
+            else str(r.geographic_view.country_criterion_id or "")
+        )
         out.append(
             {
-                "id": _make_id(r.campaign.id, criterion_id, location_type),
+                "id": _make_id(r.campaign.id, criterion_id or "unknown"),
                 "date": str(r.segments.date),
                 "campaign_id": str(r.campaign.id),
                 "state": criterion_id,
                 "state_code": criterion_id,
-                "dma": location_type,
+                "dma": _ename(r.geographic_view.location_type),
                 "spend": spend,
                 "impressions": int(r.metrics.impressions),
                 "clicks": clicks,
@@ -544,6 +606,73 @@ def _xf_geo_performance(rows: list) -> list[dict]:
             }
         )
     return out
+
+
+def _geo_target_details(ga: GoogleAdsClient, criterion_ids: list[str]) -> dict[str, dict[str, str]]:
+    """Resolve geo target criterion IDs to names and metadata."""
+    if not criterion_ids:
+        return {}
+
+    resolved: dict[str, dict[str, str]] = {}
+    # Keep query size bounded and avoid giant IN clauses.
+    chunk_size = 200
+    for i in range(0, len(criterion_ids), chunk_size):
+        chunk = criterion_ids[i : i + chunk_size]
+        id_list = ", ".join(chunk)
+        query = f"""
+            SELECT
+                geo_target_constant.id,
+                geo_target_constant.name,
+                geo_target_constant.canonical_name,
+                geo_target_constant.target_type,
+                geo_target_constant.country_code
+            FROM geo_target_constant
+            WHERE geo_target_constant.id IN ({id_list})
+        """
+        rows = _run_gaql(ga, query)
+        for row in rows:
+            geo = row.geo_target_constant
+            cid = str(geo.id)
+            resolved[cid] = {
+                "name": str(geo.name),
+                "canonical_name": str(geo.canonical_name),
+                "target_type": _ename(geo.target_type),
+                "country_code": str(geo.country_code),
+            }
+    return resolved
+
+
+def _enrich_geo_records(ga: GoogleAdsClient, records: list[dict]) -> list[dict]:
+    """Attach human-readable state names/codes to geo performance rows."""
+    criterion_ids = sorted(
+        {
+            str(r.get("state_code", "")).strip()
+            for r in records
+            if str(r.get("state_code", "")).strip().isdigit()
+        }
+    )
+    details = _geo_target_details(ga, criterion_ids)
+
+    for rec in records:
+        raw_id = str(rec.get("state_code", "")).strip()
+        info = details.get(raw_id)
+        if not info:
+            continue
+
+        name = info["name"]
+        country_code = info["country_code"]
+        target_type = info["target_type"]
+        canonical_name = info["canonical_name"]
+        if country_code == "US" and target_type in {"State", "Province"}:
+            rec["state"] = name
+            rec["state_code"] = _US_STATE_CODE_BY_NAME.get(name, raw_id)
+        else:
+            rec["state"] = canonical_name or name
+            rec["state_code"] = raw_id
+
+        rec["dma"] = target_type
+
+    return records
 
 
 def _xf_device_performance(rows: list) -> list[dict]:
@@ -790,6 +919,8 @@ def sync(date_from: str | None = None, date_to: str | None = None) -> None:
             log.info("  [%s] %d API rows", name, len(rows))
 
             records = cfg["transform"](rows)
+            if name == "geo_performance":
+                records = _enrich_geo_records(ga, records)
             log.info("  [%s] %d records → Supabase", name, len(records))
 
             n = _upsert(supa, name, records)

@@ -37,6 +37,18 @@ const dateRanges = [
   { key: '30d', label: '30D' },
 ] as const
 
+function isStateLikeCode(code: string): boolean {
+  return /^[A-Z]{2,3}$/.test((code || '').trim())
+}
+
+function getLocationLabel(state: string, stateCode: string): string {
+  if (isStateLikeCode(stateCode)) return stateCode
+  const base = (state || '').split(',')[0]?.trim() || stateCode || 'N/A'
+  const words = base.split(/\s+/).filter(Boolean)
+  if (words.length === 1) return words[0]!.slice(0, 3).toUpperCase()
+  return words.slice(0, 3).map((w) => w[0]).join('').toUpperCase()
+}
+
 export function GeographicPerformance() {
   const { dateRange, setDateRange, filters } = useDateRange()
   const [heatmapMetric, setHeatmapMetric] = useState<'conversions' | 'cpa' | 'spend' | 'roas'>('conversions')
@@ -78,6 +90,7 @@ export function GeographicPerformance() {
       .map((g) => ({
         state: g.state,
         stateCode: g.stateCode,
+        locationLabel: getLocationLabel(g.state, g.stateCode),
         cpa: g.cpa,
         roas: g.roas,
         spend: g.spend,
@@ -140,7 +153,9 @@ export function GeographicPerformance() {
       header: 'State',
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-xs text-muted-foreground">{row.original.stateCode}</span>
+          <span className="font-semibold text-xs text-muted-foreground">
+            {getLocationLabel(row.original.state, row.original.stateCode)}
+          </span>
           <span className="font-medium">{row.original.state}</span>
         </div>
       ),
@@ -249,6 +264,7 @@ export function GeographicPerformance() {
         <CardContent>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10">
             {heatmapData.map((g) => {
+              const locationLabel = getLocationLabel(g.state, g.stateCode)
               const formatValue = () => {
                 switch (heatmapMetric) {
                   case 'spend': return formatCurrency(g.value)
@@ -259,14 +275,14 @@ export function GeographicPerformance() {
               }
               return (
                 <div
-                  key={g.stateCode}
+                  key={g.id}
                   className="group relative flex flex-col items-center justify-center rounded-md border p-2 transition-all hover:shadow-md"
                   style={{
                     backgroundColor: `hsl(${142 * g.intensity}, ${40 + 30 * g.intensity}%, ${95 - 35 * g.intensity}%)`,
                   }}
                   title={`${g.state}: ${formatValue()}`}
                 >
-                  <span className="text-xs font-bold">{g.stateCode}</span>
+                  <span className="text-xs font-bold">{locationLabel}</span>
                   <span className="text-[10px] tabular-nums">{formatValue()}</span>
                 </div>
               )
@@ -309,7 +325,13 @@ export function GeographicPerformance() {
                 <BarChart data={topStates} layout="vertical" margin={{ left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v}`} />
-                  <YAxis type="category" dataKey="stateCode" tick={{ fontSize: 11 }} width={40} />
+                  <YAxis
+                    type="category"
+                    dataKey="state"
+                    tick={{ fontSize: 11 }}
+                    width={72}
+                    tickFormatter={(v: string) => getLocationLabel(v, '')}
+                  />
                   <Tooltip
                     formatter={(value: number, name: string) => {
                       if (name === 'cpa') return [formatCurrencyDetailed(value), 'CPA']
@@ -344,7 +366,13 @@ export function GeographicPerformance() {
                 <BarChart data={bottomStates} layout="vertical" margin={{ left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v}`} />
-                  <YAxis type="category" dataKey="stateCode" tick={{ fontSize: 11 }} width={40} />
+                  <YAxis
+                    type="category"
+                    dataKey="state"
+                    tick={{ fontSize: 11 }}
+                    width={72}
+                    tickFormatter={(v: string) => getLocationLabel(v, '')}
+                  />
                   <Tooltip
                     formatter={(value: number, name: string) => {
                       if (name === 'cpa') return [formatCurrencyDetailed(value), 'CPA']
@@ -400,7 +428,10 @@ export function GeographicPerformance() {
                     const d = payload[0]!.payload
                     return (
                       <div className="rounded-lg border bg-card p-2 text-xs shadow-md">
-                        <p className="font-semibold">{d.state} ({d.stateCode})</p>
+                        <p className="font-semibold">
+                          {d.state}
+                          {isStateLikeCode(d.stateCode) ? ` (${d.stateCode})` : ''}
+                        </p>
                         <p>CPA: {formatCurrencyDetailed(d.cpa)}</p>
                         <p>ROAS: {formatMultiplier(d.roas)}</p>
                         <p>Spend: {formatCurrency(d.spend)}</p>
