@@ -2,10 +2,12 @@
 // Search Term Intelligence Page
 // Winner/Loser classification, new term discovery,
 // negative keyword opportunities, and recommended actions
+// 2026-02-19: Wired search-term summary fetch to global date-range filters.
 // ============================================================
 
 import { useMemo, useState } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getSearchTermSummary } from '@/data'
 import type { SearchTerm } from '@/data/types'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -42,7 +44,11 @@ const LABEL_COLORS: Record<string, string> = {
 }
 
 export function SearchTermIntelligence() {
-  const { data: termSummary, loading } = useAsync(() => getSearchTermSummary(), [])
+  const { dateRange, filters: dateFilters } = useDateRange()
+  const { data: termSummary, loading } = useAsync(
+    () => getSearchTermSummary(dateFilters),
+    [dateRange]
+  )
   const [activeTab, setActiveTab] = useState('winners')
 
   // Computed stats

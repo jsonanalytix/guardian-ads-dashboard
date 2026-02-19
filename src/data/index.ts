@@ -2,6 +2,7 @@
 // Data Access Layer
 // Queries Supabase when configured, falls back to mock data.
 // Updated: Wired all 11 direct table queries to Supabase.
+// 2026-02-19: Budget pacing now reads editable product budgets from localStorage config.
 // ============================================================
 
 import type {
@@ -33,6 +34,7 @@ import type {
 
 import { isSupabaseConfigured, getSupabaseBrowserClient } from '../lib/supabase'
 import { mapRow } from '../lib/case-utils'
+import { DEFAULT_PRODUCT_BUDGETS, getProductBudgets } from '../lib/budget-config'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -404,32 +406,50 @@ export async function getKeywordPerformance(filters?: Filters): Promise<Keyword[
   return mapped
 }
 
-export async function getKeywordSummaryByDate(): Promise<Keyword[]> {
+// 2026-02-19: Respect global date-range/product filters for keyword summary.
+export async function getKeywordSummaryByDate(filters?: Filters): Promise<Keyword[]> {
   if (!isSupabaseConfigured) {
     const { keywordData } = await import('./mock/keywords')
-    const dates = [...new Set(keywordData.map((k) => k.date))].sort()
+    const filtered = filterByDateRange(keywordData, filters)
+    const dates = [...new Set(filtered.map((k) => k.date))].sort()
     const latestDate = dates[dates.length - 1]!
-    return keywordData.filter((k) => k.date === latestDate)
+    if (!latestDate) return []
+
+    let latestRows = filtered.filter((k) => k.date === latestDate)
+    if (filters?.products?.length) {
+      latestRows = latestRows.filter((k) =>
+        filters.products!.some((p) =>
+          k.campaignName.toLowerCase().includes(p.toLowerCase().split(' ')[0]!)
+        )
+      )
+    }
+    return latestRows
   }
 
-  const { data, error } = await sb()
+  let query = sb()
     .from('keywords')
     .select('*')
-    .order('date', { ascending: false })
-    .limit(1)
+  const cutoff = getDateCutoff(filters)
+  if (cutoff) query = query.gte('date', cutoff)
+
+  const { data, error } = await query.limit(50000)
 
   if (error) throw error
-  const latestDate = (data?.[0] as Record<string, unknown> | undefined)?.date as string | undefined
+  let mapped = (data ?? []).map((row) => toKeyword(row as Record<string, unknown>))
+
+  if (filters?.products?.length) {
+    mapped = mapped.filter((k) =>
+      filters.products!.some((p) =>
+        k.campaignName.toLowerCase().includes(p.toLowerCase().split(' ')[0]!)
+      )
+    )
+  }
+
+  const orderedDates = [...new Set(mapped.map((k) => k.date))].sort()
+  const latestDate = orderedDates[orderedDates.length - 1]
   if (!latestDate) return []
 
-  const { data: rows, error: err2 } = await sb()
-    .from('keywords')
-    .select('*')
-    .eq('date', latestDate)
-    .limit(50000)
-
-  if (err2) throw err2
-  return (rows ?? []).map((row) => toKeyword(row as Record<string, unknown>))
+  return mapped.filter((k) => k.date === latestDate)
 }
 
 // ===================================================================
@@ -471,7 +491,8 @@ export async function getSearchTermReport(filters?: Filters): Promise<SearchTerm
   return mapped
 }
 
-export async function getSearchTermSummary(): Promise<{
+// 2026-02-19: Respect global date-range/product filters for search-term summary.
+export async function getSearchTermSummary(filters?: Filters): Promise<{
   winners: SearchTerm[]
   losers: SearchTerm[]
   newTerms: SearchTerm[]
@@ -479,16 +500,35 @@ export async function getSearchTermSummary(): Promise<{
 }> {
   if (!isSupabaseConfigured) {
     const { searchTermData } = await import('./mock/search-terms')
-    return aggregateSearchTerms(searchTermData)
+    let filtered = filterByDateRange(searchTermData, filters)
+    if (filters?.products?.length) {
+      filtered = filtered.filter((t) =>
+        filters.products!.some((p) =>
+          t.campaignName.toLowerCase().includes(p.toLowerCase().split(' ')[0]!)
+        )
+      )
+    }
+    return aggregateSearchTerms(filtered)
   }
 
-  const { data, error } = await sb()
+  let query = sb()
     .from('search_terms')
     .select('*')
-    .limit(50000)
+  const cutoff = getDateCutoff(filters)
+  if (cutoff) query = query.gte('date', cutoff)
+
+  const { data, error } = await query.limit(50000)
 
   if (error) throw error
-  const mapped = (data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>))
+  let mapped = (data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>))
+
+  if (filters?.products?.length) {
+    mapped = mapped.filter((t) =>
+      filters.products!.some((p) =>
+        t.campaignName.toLowerCase().includes(p.toLowerCase().split(' ')[0]!)
+      )
+    )
+  }
   return aggregateSearchTerms(mapped)
 }
 
@@ -661,15 +701,7 @@ type CampaignTotals = {
   ctr: number
 }
 
-const PRODUCT_BUDGETS: Record<Product, number> = {
-  'Term Life': 65000,
-  'Disability': 40000,
-  'Annuities': 35000,
-  'Dental Network': 25000,
-  'Group Benefits': 15000,
-}
-
-const ALL_PRODUCTS = Object.keys(PRODUCT_BUDGETS) as Product[]
+const ALL_PRODUCTS = Object.keys(DEFAULT_PRODUCT_BUDGETS) as Product[]
 
 function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value))
@@ -794,6 +826,7 @@ async function getCurrentAndPreviousCampaignWindows(filters?: Filters): Promise<
 
 export async function getBudgetPacing(filters?: Filters): Promise<BudgetPacing[]> {
   const campaigns = await getCampaignPerformance(filters)
+  const productBudgets = getProductBudgets()
   const dateKeys = getDateKeys(campaigns)
   const daysElapsed = Math.max(dateKeys.length, 1)
 
@@ -807,7 +840,7 @@ export async function getBudgetPacing(filters?: Filters): Promise<BudgetPacing[]
   }
 
   return ALL_PRODUCTS.map((product) => {
-    const monthlyBudget = PRODUCT_BUDGETS[product]
+    const monthlyBudget = productBudgets[product]
     const mtdSpend = Math.round(spendByProduct.get(product) ?? 0)
     const mtdTarget = Math.round((monthlyBudget / daysInMonth) * daysElapsed)
     const dailyAvgSpend = Math.round(mtdSpend / daysElapsed)

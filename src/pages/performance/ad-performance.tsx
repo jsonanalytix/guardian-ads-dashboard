@@ -4,11 +4,14 @@
 // headline/description performance, asset analysis
 // 2026-02-19: Headline metrics now use fractional attribution and confidence scoring
 // so repeated headlines across many RSAs are directional and non-duplicative.
+// 2026-02-19: Wired Ads tab to global date-range filters so cards/charts/table
+// stay in sync with the header picker; total conversions card now rounds to whole numbers.
 // ============================================================
 
 import { useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
-import { getAdSummary, getAdPerformance } from '@/data'
+import { useDateRange } from '@/hooks/use-date-range'
+import { getAdPerformance } from '@/data'
 import type { Ad } from '@/data/types'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { TooltipProps } from 'recharts'
@@ -67,18 +70,11 @@ function normalizeHeadline(value: string): string {
 }
 
 export function AdPerformancePage() {
-  const { data: adSummary, loading: summaryLoading } = useAsync(() => getAdSummary(), [])
-  const { data: allAds, loading: allLoading } = useAsync(() => getAdPerformance(), [])
-
-  // Ad strength distribution
-  const strengthDistribution = useMemo(() => {
-    if (!adSummary) return []
-    return Object.entries(adSummary.byStrength).map(([strength, ads]) => ({
-      name: strength,
-      value: ads.length,
-      fill: STRENGTH_COLORS[strength] ?? '#6b7280',
-    }))
-  }, [adSummary])
+  const { dateRange, filters: dateFilters } = useDateRange()
+  const { data: allAds, loading: allLoading } = useAsync(
+    () => getAdPerformance(dateFilters),
+    [dateRange]
+  )
 
   // Aggregated ad performance (sum across 30 days per ad group)
   const aggregatedAds = useMemo(() => {
@@ -107,6 +103,22 @@ export function AdPerformancePage() {
       cpa: a.conversions > 0 ? Math.round((a.spend / a.conversions) * 100) / 100 : 0,
     }))
   }, [allAds])
+
+  // Ad strength distribution
+  const strengthDistribution = useMemo(() => {
+    if (!aggregatedAds.length) return []
+
+    const byStrength = aggregatedAds.reduce<Record<string, number>>((acc, ad) => {
+      acc[ad.adStrength] = (acc[ad.adStrength] ?? 0) + 1
+      return acc
+    }, {})
+
+    return Object.entries(byStrength).map(([strength, count]) => ({
+      name: strength,
+      value: count,
+      fill: STRENGTH_COLORS[strength] ?? '#6b7280',
+    }))
+  }, [aggregatedAds])
 
   // Headline performance analysis (directional only; no true asset-level attribution)
   const headlineStats = useMemo(() => {
@@ -292,7 +304,7 @@ export function AdPerformancePage() {
     },
   ]
 
-  const loading = summaryLoading || allLoading
+  const loading = allLoading
   if (loading) {
     return <LoadingSkeleton />
   }
@@ -331,7 +343,7 @@ export function AdPerformancePage() {
           icon={Target}
           iconColor="text-amber-600"
           label="Total Conversions"
-          value={String(summaryStats?.totalConv ?? 0)}
+          value={(summaryStats?.totalConv ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
         />
       </div>
 

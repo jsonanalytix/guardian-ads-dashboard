@@ -263,6 +263,38 @@ The `public/_headers` file applies security headers to all responses:
 | `npm run preview` | Preview production build locally         |
 | `npm run lint`    | Run ESLint                               |
 
+## Google Ads ETL
+
+The ETL pipeline now lives inside this app at `scripts/sync_google_ads.py` and is automated by `.github/workflows/sync-google-ads.yml`.
+
+### Manual Run
+
+```bash
+python3 -m pip install -r scripts/requirements.txt
+python3 scripts/sync_google_ads.py --help
+
+# Default behavior: sync yesterday (UTC)
+python3 scripts/sync_google_ads.py
+
+# Single date
+python3 scripts/sync_google_ads.py --date 2026-02-17
+
+# Date range
+python3 scripts/sync_google_ads.py --date-from 2026-02-01 --date-to 2026-02-17
+```
+
+### Required Secrets / Env Vars
+
+Configure these values in GitHub Actions secrets (for workflow runs) and your local environment (for manual runs):
+
+- `GOOGLE_ADS_DEVELOPER_TOKEN`
+- `GOOGLE_ADS_CLIENT_ID`
+- `GOOGLE_ADS_CLIENT_SECRET`
+- `GOOGLE_ADS_REFRESH_TOKEN`
+- `GOOGLE_ADS_CUSTOMER_ID`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+
 ---
 
 ## Build Phases

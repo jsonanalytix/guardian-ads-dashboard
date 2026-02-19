@@ -1,10 +1,20 @@
 // Budget Pacing - visual gauge per product
+// 2026-02-19: Added in-app editable monthly budgets and aligned
+// header metrics to MTD Spend / MTD Target for consistency.
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
 import { InfoTooltip } from '@/components/ui/info-tooltip'
 import type { BudgetPacing } from '@/data/types'
+import type { Product } from '@/data/types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  getProductBudgets,
+  saveProductBudgets,
+} from '@/lib/budget-config'
 
 interface BudgetPacingCardProps {
   budgets: BudgetPacing[]
@@ -24,10 +34,46 @@ function getPacingLabel(percent: number): string {
 }
 
 export function BudgetPacingCard({ budgets }: BudgetPacingCardProps) {
+  const [isEditingBudgets, setIsEditingBudgets] = useState(false)
+  const [draftBudgets, setDraftBudgets] = useState<Record<Product, string>>({} as Record<Product, string>)
+
+  const productOrder = useMemo(() => budgets.map((b) => b.product), [budgets])
   const totalBudget = budgets.reduce((sum, b) => sum + b.monthlyBudget, 0)
   const totalMtdSpend = budgets.reduce((sum, b) => sum + b.mtdSpend, 0)
   const totalMtdTarget = budgets.reduce((sum, b) => sum + b.mtdTarget, 0)
   const overallPacing = Math.round((totalMtdSpend / totalMtdTarget) * 100)
+
+  useEffect(() => {
+    const current = getProductBudgets()
+    const nextDraft = {} as Record<Product, string>
+    for (const product of productOrder) {
+      nextDraft[product] = String(current[product])
+    }
+    setDraftBudgets(nextDraft)
+  }, [productOrder])
+
+  function handleDraftChange(product: Product, value: string) {
+    setDraftBudgets((prev) => ({ ...prev, [product]: value }))
+  }
+
+  function handleSaveBudgets() {
+    const next = { ...getProductBudgets() }
+    for (const product of productOrder) {
+      next[product] = Number(draftBudgets[product] ?? next[product])
+    }
+    saveProductBudgets(next)
+    setIsEditingBudgets(false)
+  }
+
+  function handleCancelBudgets() {
+    const current = getProductBudgets()
+    const resetDraft = {} as Record<Product, string>
+    for (const product of productOrder) {
+      resetDraft[product] = String(current[product])
+    }
+    setDraftBudgets(resetDraft)
+    setIsEditingBudgets(false)
+  }
 
   return (
     <Card>
@@ -40,24 +86,68 @@ export function BudgetPacingCard({ budgets }: BudgetPacingCardProps) {
               side="right"
             />
           </CardTitle>
-          <div className="text-right">
+          <div className="text-right space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-              MTD Total
+              MTD Spend / MTD Target
               <InfoTooltip
-                content="Month-to-date spend across all products vs. the combined monthly budget."
+                content="Month-to-date spend across all products versus the combined prorated month-to-date target."
                 side="left"
               />
             </p>
             <p className="text-sm font-bold">
               {formatCurrency(totalMtdSpend)}{' '}
               <span className="text-xs font-normal text-muted-foreground">
-                / {formatCurrency(totalBudget)}
+                / {formatCurrency(totalMtdTarget)}
               </span>
             </p>
+            <p className="text-[11px] text-muted-foreground">
+              Monthly budget: {formatCurrency(totalBudget)}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={() => setIsEditingBudgets((prev) => !prev)}
+            >
+              {isEditingBudgets ? 'Close' : 'Edit budgets'}
+            </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isEditingBudgets && (
+          <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+            <p className="text-xs font-medium">Adjust monthly budgets (USD)</p>
+            <div className="grid gap-2">
+              {productOrder.map((product) => (
+                <div key={product} className="grid grid-cols-[1fr_130px] items-center gap-2">
+                  <label className="text-xs text-muted-foreground">{product}</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={draftBudgets[product] ?? ''}
+                    onChange={(e) => handleDraftChange(product, e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={handleCancelBudgets}>
+                Cancel
+              </Button>
+              <Button type="button" size="sm" className="h-7 text-[11px]" onClick={handleSaveBudgets}>
+                Save budgets
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Saved locally for this browser. Values refresh across dashboard cards immediately.
+            </p>
+          </div>
+        )}
+
         {/* Overall progress */}
         <div>
           <div className="flex items-center justify-between mb-1">

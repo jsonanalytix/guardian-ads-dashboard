@@ -2,10 +2,12 @@
 // Keyword Performance Page
 // Keyword table with Quality Score distribution chart,
 // top/bottom performers highlighting, and bid recommendations
+// 2026-02-19: Wired keyword summary fetch to global date-range filters.
 // ============================================================
 
 import { useMemo } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useDateRange } from '@/hooks/use-date-range'
 import { getKeywordSummaryByDate } from '@/data'
 import type { Keyword } from '@/data/types'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -32,7 +34,11 @@ const QS_COLORS: Record<string, string> = {
 }
 
 export function KeywordPerformance() {
-  const { data: keywords, loading } = useAsync(() => getKeywordSummaryByDate(), [])
+  const { dateRange, filters: dateFilters } = useDateRange()
+  const { data: keywords, loading } = useAsync(
+    () => getKeywordSummaryByDate(dateFilters),
+    [dateRange]
+  )
 
   // Quality Score distribution
   const qsDistribution = useMemo(() => {

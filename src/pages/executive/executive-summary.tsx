@@ -5,10 +5,12 @@
 // Top Movers, Alerts & Recommendations, Product Donut
 // Phase 7: Connected to global DateRangeContext so the header
 // date picker drives data refreshes.
+// 2026-02-19: Budget-dependent cards now refresh after in-app budget edits.
 // ============================================================
 
 import { useAsync } from '@/hooks/use-data'
 import { useDateRange } from '@/hooks/use-date-range'
+import { useBudgetRefreshToken } from '@/hooks/use-budget-refresh'
 import {
   getKpiSummary,
   getAccountHealthScore,
@@ -29,12 +31,22 @@ const inverseMetrics = new Set(['CPA'])
 
 export function ExecutiveSummary() {
   const { filters, dateRange } = useDateRange()
+  const budgetRefreshToken = useBudgetRefreshToken()
 
   const { data: kpis, loading: kpisLoading } = useAsync(() => getKpiSummary(filters), [dateRange])
-  const { data: healthScore, loading: healthLoading } = useAsync(() => getAccountHealthScore(filters), [dateRange])
-  const { data: budgets, loading: budgetsLoading } = useAsync(() => getBudgetPacing(filters), [dateRange])
+  const { data: healthScore, loading: healthLoading } = useAsync(
+    () => getAccountHealthScore(filters),
+    [dateRange, budgetRefreshToken]
+  )
+  const { data: budgets, loading: budgetsLoading } = useAsync(
+    () => getBudgetPacing(filters),
+    [dateRange, budgetRefreshToken]
+  )
   const { data: movers, loading: moversLoading } = useAsync(() => getTopMovers(filters), [dateRange])
-  const { data: alerts, loading: alertsLoading } = useAsync(() => getAlerts(filters), [dateRange])
+  const { data: alerts, loading: alertsLoading } = useAsync(
+    () => getAlerts(filters),
+    [dateRange, budgetRefreshToken]
+  )
   const { data: products, loading: productsLoading } = useAsync(() => getProductSummary(filters), [dateRange])
 
   const isLoading = kpisLoading || healthLoading || budgetsLoading || moversLoading || alertsLoading || productsLoading

@@ -2,10 +2,12 @@
 // Product Analytics Page
 // Phase 4: Product-level KPI cards, product comparison chart,
 // product trend lines, campaign drill-down, and strength indicators
+// 2026-02-19: Budget cards now refresh after in-app monthly budget edits.
 // ============================================================
 
 import { useMemo, useState } from 'react'
 import { useAsync } from '@/hooks/use-data'
+import { useBudgetRefreshToken } from '@/hooks/use-budget-refresh'
 import { getProductSummary, getBudgetPacing, getCampaignPerformance, getProductTimeSeries } from '@/data'
 import type { ProductSummary, BudgetPacing, Campaign, Product } from '@/data/types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -63,8 +65,12 @@ const STRENGTH_CONFIG = {
 }
 
 export function ProductAnalytics() {
+  const budgetRefreshToken = useBudgetRefreshToken()
   const { data: products, loading: prodLoading } = useAsync(() => getProductSummary())
-  const { data: budgets, loading: budgetLoading } = useAsync(() => getBudgetPacing())
+  const { data: budgets, loading: budgetLoading } = useAsync(
+    () => getBudgetPacing(),
+    [budgetRefreshToken]
+  )
   const { data: campaigns, loading: campLoading } = useAsync(() => getCampaignPerformance())
 
   const [trendMetric, setTrendMetric] = useState<'spend' | 'conversions' | 'cpa' | 'roas'>('conversions')
