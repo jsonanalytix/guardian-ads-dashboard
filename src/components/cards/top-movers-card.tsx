@@ -45,12 +45,17 @@ export function TopMoversCard({ movers }: TopMoversCardProps) {
         <CardTitle className="text-base flex items-center gap-1.5">
           Top Movers (WoW)
           <InfoTooltip
-            content="Campaigns with the largest metric swings vs. the prior period. For each campaign, the metric with the biggest absolute % change is shown (Conversions, CPA, ROAS, or CTR). Top 8 movers are displayed."
+            content="Campaigns with the largest metric swings vs. the prior period. For each campaign, the metric with the biggest absolute % change is shown (Conversions, CPA, ROAS, or CTR). Zero-to-positive baseline jumps are excluded because they can overstate impact. Top 8 movers are displayed."
             side="right"
           />
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {movers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No meaningful movers in this period. Prior-period zero baselines are excluded from mover rankings.
+          </p>
+        ) : (
         <div className="space-y-4">
           {/* Positive movers */}
           <div>
@@ -76,6 +81,7 @@ export function TopMoversCard({ movers }: TopMoversCardProps) {
             </div>
           </div>
         </div>
+        )}
       </CardContent>
     </Card>
   )

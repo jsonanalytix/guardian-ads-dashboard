@@ -681,6 +681,16 @@ function percentChange(current: number, previous: number): number {
   return ((current - previous) / previous) * 100
 }
 
+function hasMeaningfulPercentBaseline(current: number, previous: number): boolean {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return false
+  // Exclude "new from zero" changes (e.g., 0 -> positive) because the % swing is technically
+  // correct but not decision-useful when the prior period had no baseline activity.
+  if (previous === 0 && current > 0) return false
+  // Skip all-zero pairs to avoid filling movers with flat/no-signal entries.
+  if (previous === 0 && current === 0) return false
+  return true
+}
+
 function trendDirection(changePercent: number): 'up' | 'down' | 'flat' {
   if (Math.abs(changePercent) < 0.1) return 'flat'
   return changePercent > 0 ? 'up' : 'down'
@@ -936,7 +946,9 @@ export async function getTopMovers(filters?: Filters): Promise<TopMover[]> {
       },
     ]
 
-    const best = candidates.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))[0]
+    const best = candidates
+      .filter((candidate) => hasMeaningfulPercentBaseline(candidate.currentValue, candidate.previousValue))
+      .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))[0]
     if (!best || !Number.isFinite(best.changePercent)) continue
 
     movers.push({

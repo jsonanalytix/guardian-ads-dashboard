@@ -54,7 +54,7 @@ export function AlertsCard({ alerts }: AlertsCardProps) {
           <CardTitle className="text-base flex items-center gap-1.5">
             Alerts & Recommendations
             <InfoTooltip
-              content="Auto-generated from top movers and budget pacing. CPA increase > 15% = Critical. Metric change > 20% = Warning (or Success for rising conversions). Products pacing below 85% of target trigger a Warning."
+              content="Auto-generated from top movers and budget pacing. CPA increase > 15% = Critical. Metric change > 20% = Warning (or Success for rising conversions). Products pacing below 85% of target trigger a Warning. Zero-to-positive prior-period baselines are excluded from mover-driven alerts."
               side="right"
             />
           </CardTitle>
@@ -66,6 +66,11 @@ export function AlertsCard({ alerts }: AlertsCardProps) {
       <CardContent className="p-0">
         <ScrollArea className="h-[360px]">
           <div className="space-y-2 px-6 pb-6">
+            {alerts.length === 0 && (
+              <p className="pt-2 text-sm text-muted-foreground">
+                No active alerts. Mover alerts exclude zero-baseline jumps to avoid misleading recommendations.
+              </p>
+            )}
             {alerts.map((alert) => {
               const config = severityConfig[alert.severity]
               const Icon = config.icon
