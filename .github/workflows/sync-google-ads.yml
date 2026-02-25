@@ -56,5 +56,12 @@ jobs:
             fi
           elif [ -n "${{ inputs.date }}" ]; then
             ARGS="--date ${{ inputs.date }}"
+          else
+            # Default scheduled behavior: overlap past 7 days through yesterday
+            # to capture late conversion attribution updates.
+            DATE_TO="$(date -u -d "yesterday" +%F)"
+            DATE_FROM="$(date -u -d "7 days ago" +%F)"
+            ARGS="--date-from ${DATE_FROM} --date-to ${DATE_TO}"
           fi
+          echo "Running sync_google_ads.py ${ARGS}"
           python3 scripts/sync_google_ads.py $ARGS
