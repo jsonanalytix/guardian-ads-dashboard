@@ -272,6 +272,7 @@ GAQL["campaigns"] = """
         segments.date
     FROM campaign
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
 """
 
 GAQL["keywords"] = """
@@ -291,6 +292,7 @@ GAQL["keywords"] = """
         segments.date
     FROM keyword_view
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
 """
 
 GAQL["search_terms"] = """
@@ -304,6 +306,7 @@ GAQL["search_terms"] = """
         segments.date
     FROM search_term_view
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND metrics.cost_micros > 0
 """
 
@@ -321,12 +324,14 @@ GAQL["ads"] = """
         segments.date
     FROM ad_group_ad
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
 """
 
 GAQL["geo_performance"] = """
     SELECT
         campaign.id,
+        campaign.advertising_channel_type,
         segments.geo_target_region,
         geographic_view.country_criterion_id,
         geographic_view.location_type,
@@ -336,6 +341,7 @@ GAQL["geo_performance"] = """
         segments.date
     FROM geographic_view
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND metrics.cost_micros > 0
 """
 
@@ -393,6 +399,7 @@ GAQL["quality_score_snapshots"] = """
         segments.date
     FROM keyword_view
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND ad_group_criterion.quality_info.quality_score IS NOT NULL
 """
 
@@ -405,11 +412,13 @@ GAQL["conversion_actions"] = """
         segments.date
     FROM campaign
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND metrics.conversions > 0
 """
 
 GAQL["landing_pages"] = """
     SELECT
+        campaign.advertising_channel_type,
         landing_page_view.unexpanded_final_url,
         metrics.clicks, metrics.impressions,
         metrics.conversions, metrics.conversions_value,
@@ -417,6 +426,7 @@ GAQL["landing_pages"] = """
         segments.date
     FROM landing_page_view
     WHERE {date_condition}
+        AND campaign.advertising_channel_type = 'SEARCH'
         AND metrics.cost_micros > 0
 """
 

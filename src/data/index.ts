@@ -62,6 +62,68 @@ const DOW_NAME_TO_NUM: Record<string, number> = {
   Saturday: 6,
 }
 
+const NON_SEARCH_CAMPAIGN_PATTERNS = [
+  /\byoutube\b/i,
+  /\bvideo\b/i,
+  /\bdemand\s*gen\b/i,
+  /\bdisplay\b/i,
+  /\bdiscovery\b/i,
+  /\bpmax\b/i,
+  /\bperformance\s*max\b/i,
+]
+
+function isSearchCampaignName(name: string): boolean {
+  return !NON_SEARCH_CAMPAIGN_PATTERNS.some((pattern) => pattern.test(name || ''))
+}
+
+function filterSearchCampaignRowsByName<T extends { campaignName: string }>(rows: T[]): T[] {
+  return rows.filter((row) => isSearchCampaignName(row.campaignName))
+}
+
+function filterBySearchCampaignIds<T extends { campaignId: string }>(rows: T[], allowedCampaignIds: Set<string>): T[] {
+  if (allowedCampaignIds.size === 0) return []
+  return rows.filter((row) => allowedCampaignIds.has(row.campaignId))
+}
+
+async function getSearchCampaignIdSet(filters?: Filters): Promise<Set<string>> {
+  if (!isSupabaseConfigured) {
+    const { campaignData } = await import('./mock/campaigns')
+    let filtered = filterByDateRange(campaignData, filters)
+    if (filters?.products?.length) {
+      filtered = filtered.filter((c) => filters.products!.includes(c.product))
+    }
+    if (filters?.intentBuckets?.length) {
+      filtered = filtered.filter((c) => filters.intentBuckets!.includes(c.intentBucket))
+    }
+    if (filters?.campaignStatus?.length) {
+      filtered = filtered.filter((c) => filters.campaignStatus!.includes(c.status))
+    }
+    return new Set(
+      filtered
+        .filter((c) => isSearchCampaignName(c.campaignName))
+        .map((c) => c.id)
+    )
+  }
+
+  let query = sb().from('campaigns').select('id,campaign_name')
+  query = applyDateRangeToQuery(query, filters)
+  if (filters?.products?.length) query = query.in('product', filters.products)
+  if (filters?.intentBuckets?.length) query = query.in('intent_bucket', filters.intentBuckets)
+  if (filters?.campaignStatus?.length) {
+    const dbStatuses = filters.campaignStatus.map((s) => STATUS_UI_TO_DB[s] ?? s.toLowerCase())
+    query = query.in('status', dbStatuses)
+  }
+
+  const { data, error } = await query.limit(50000)
+  if (error) throw error
+  return new Set(
+    (data ?? [])
+      .filter((row) => isSearchCampaignName(String((row as Record<string, unknown>).campaign_name ?? '')))
+      .map((row) => String((row as Record<string, unknown>).id ?? ''))
+      .filter(Boolean)
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -351,7 +413,7 @@ export async function getLatestAccountSummary(): Promise<AccountSummary> {
 export async function getCampaignPerformance(filters?: Filters): Promise<Campaign[]> {
   if (!isSupabaseConfigured) {
     const { campaignData } = await import('./mock/campaigns')
-    let filtered = filterByDateRange(campaignData, filters)
+    let filtered = filterSearchCampaignRowsByName(filterByDateRange(campaignData, filters))
     if (filters?.products?.length) {
       filtered = filtered.filter((c) => filters.products!.includes(c.product))
     }
@@ -376,7 +438,7 @@ export async function getCampaignPerformance(filters?: Filters): Promise<Campaig
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toCampaign(row as Record<string, unknown>))
+  return filterSearchCampaignRowsByName((data ?? []).map((row) => toCampaign(row as Record<string, unknown>)))
 }
 
 export async function getCampaignSummary(): Promise<{
@@ -406,7 +468,7 @@ export async function getCampaignSummary(): Promise<{
 export async function getKeywordPerformance(filters?: Filters): Promise<Keyword[]> {
   if (!isSupabaseConfigured) {
     const { keywordData } = await import('./mock/keywords')
-    let filtered = filterByDateRange(keywordData, filters)
+    let filtered = filterSearchCampaignRowsByName(filterByDateRange(keywordData, filters))
     if (filters?.products?.length) {
       filtered = filtered.filter((k) =>
         filters.products!.some((p) =>
@@ -424,7 +486,7 @@ export async function getKeywordPerformance(filters?: Filters): Promise<Keyword[
   const { data, error } = await query.limit(50000)
   if (error) throw error
 
-  let mapped = (data ?? []).map((row) => toKeyword(row as Record<string, unknown>))
+  let mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toKeyword(row as Record<string, unknown>)))
 
   if (filters?.products?.length) {
     mapped = mapped.filter((k) =>
@@ -441,7 +503,7 @@ export async function getKeywordPerformance(filters?: Filters): Promise<Keyword[
 export async function getKeywordSummaryByDate(filters?: Filters): Promise<Keyword[]> {
   if (!isSupabaseConfigured) {
     const { keywordData } = await import('./mock/keywords')
-    const filtered = filterByDateRange(keywordData, filters)
+    const filtered = filterSearchCampaignRowsByName(filterByDateRange(keywordData, filters))
     const dates = [...new Set(filtered.map((k) => k.date))].sort()
     const latestDate = dates[dates.length - 1]!
     if (!latestDate) return []
@@ -465,7 +527,7 @@ export async function getKeywordSummaryByDate(filters?: Filters): Promise<Keywor
   const { data, error } = await query.limit(50000)
 
   if (error) throw error
-  let mapped = (data ?? []).map((row) => toKeyword(row as Record<string, unknown>))
+  let mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toKeyword(row as Record<string, unknown>)))
 
   if (filters?.products?.length) {
     mapped = mapped.filter((k) =>
@@ -489,7 +551,7 @@ export async function getKeywordSummaryByDate(filters?: Filters): Promise<Keywor
 export async function getSearchTermReport(filters?: Filters): Promise<SearchTerm[]> {
   if (!isSupabaseConfigured) {
     const { searchTermData } = await import('./mock/search-terms')
-    let filtered = filterByDateRange(searchTermData, filters)
+    let filtered = filterSearchCampaignRowsByName(filterByDateRange(searchTermData, filters))
     if (filters?.products?.length) {
       filtered = filtered.filter((t) =>
         filters.products!.some((p) =>
@@ -507,7 +569,7 @@ export async function getSearchTermReport(filters?: Filters): Promise<SearchTerm
   const { data, error } = await query.limit(50000)
   if (error) throw error
 
-  let mapped = (data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>))
+  let mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>)))
 
   if (filters?.products?.length) {
     mapped = mapped.filter((t) =>
@@ -529,7 +591,7 @@ export async function getSearchTermSummary(filters?: Filters): Promise<{
 }> {
   if (!isSupabaseConfigured) {
     const { searchTermData } = await import('./mock/search-terms')
-    let filtered = filterByDateRange(searchTermData, filters)
+    let filtered = filterSearchCampaignRowsByName(filterByDateRange(searchTermData, filters))
     if (filters?.products?.length) {
       filtered = filtered.filter((t) =>
         filters.products!.some((p) =>
@@ -548,7 +610,7 @@ export async function getSearchTermSummary(filters?: Filters): Promise<{
   const { data, error } = await query.limit(50000)
 
   if (error) throw error
-  let mapped = (data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>))
+  let mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toSearchTerm(row as Record<string, unknown>)))
 
   if (filters?.products?.length) {
     mapped = mapped.filter((t) =>
@@ -598,7 +660,7 @@ function aggregateSearchTerms(searchTermData: SearchTerm[]) {
 export async function getAdPerformance(filters?: Filters): Promise<Ad[]> {
   if (!isSupabaseConfigured) {
     const { adData } = await import('./mock/ads')
-    let filtered = filterByDateRange(adData, filters)
+    let filtered = filterSearchCampaignRowsByName(filterByDateRange(adData, filters))
     if (filters?.products?.length) {
       filtered = filtered.filter((a) =>
         filters.products!.some((p) =>
@@ -616,7 +678,7 @@ export async function getAdPerformance(filters?: Filters): Promise<Ad[]> {
   const { data, error } = await query.limit(50000)
   if (error) throw error
 
-  let mapped = (data ?? []).map((row) => toAd(row as Record<string, unknown>))
+  let mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toAd(row as Record<string, unknown>)))
 
   if (filters?.products?.length) {
     mapped = mapped.filter((a) =>
@@ -635,7 +697,7 @@ export async function getAdSummary(): Promise<{
 }> {
   if (!isSupabaseConfigured) {
     const { adData } = await import('./mock/ads')
-    return buildAdSummary(adData)
+    return buildAdSummary(filterSearchCampaignRowsByName(adData))
   }
 
   const { data, error } = await sb()
@@ -644,7 +706,7 @@ export async function getAdSummary(): Promise<{
     .limit(50000)
 
   if (error) throw error
-  const mapped = (data ?? []).map((row) => toAd(row as Record<string, unknown>))
+  const mapped = filterSearchCampaignRowsByName((data ?? []).map((row) => toAd(row as Record<string, unknown>)))
   return buildAdSummary(mapped)
 }
 
@@ -1181,9 +1243,10 @@ export async function getAccountHealthScore(filters?: Filters): Promise<AccountH
 // ===================================================================
 
 export async function getQualityScoreHistory(filters?: Filters): Promise<QualityScoreSnapshot[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { qualityScoreData } = await import('./mock/quality-scores')
-    return filterByDateRange(qualityScoreData, filters)
+    return filterBySearchCampaignIds(filterByDateRange(qualityScoreData, filters), allowedCampaignIds)
   }
 
   let query = sb().from('quality_score_snapshots').select('*')
@@ -1192,15 +1255,16 @@ export async function getQualityScoreHistory(filters?: Filters): Promise<Quality
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toQualityScore(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toQualityScore(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getQualityScoreLatest(): Promise<QualityScoreSnapshot[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet()
   if (!isSupabaseConfigured) {
     const { qualityScoreData } = await import('./mock/quality-scores')
     const dates = [...new Set(qualityScoreData.map((q) => q.date))].sort()
     const latestDate = dates[dates.length - 1]!
-    return qualityScoreData.filter((q) => q.date === latestDate)
+    return filterBySearchCampaignIds(qualityScoreData.filter((q) => q.date === latestDate), allowedCampaignIds)
   }
 
   const { data, error } = await sb()
@@ -1220,7 +1284,7 @@ export async function getQualityScoreLatest(): Promise<QualityScoreSnapshot[]> {
     .limit(50000)
 
   if (err2) throw err2
-  return (rows ?? []).map((row) => toQualityScore(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((rows ?? []).map((row) => toQualityScore(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 // ===================================================================
@@ -1228,9 +1292,10 @@ export async function getQualityScoreLatest(): Promise<QualityScoreSnapshot[]> {
 // ===================================================================
 
 export async function getGeoPerformance(filters?: Filters): Promise<GeoPerformance[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { geoData } = await import('./mock/geo')
-    return filterByDateRange(geoData, filters)
+    return filterBySearchCampaignIds(filterByDateRange(geoData, filters), allowedCampaignIds)
   }
 
   let query = sb().from('geo_performance').select('*')
@@ -1239,7 +1304,7 @@ export async function getGeoPerformance(filters?: Filters): Promise<GeoPerforman
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toGeo(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toGeo(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getGeoSummary(filters?: Filters): Promise<GeoPerformance[]> {
@@ -1275,9 +1340,10 @@ export async function getGeoSummary(filters?: Filters): Promise<GeoPerformance[]
 // ===================================================================
 
 export async function getDevicePerformance(filters?: Filters): Promise<DevicePerformance[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { deviceData } = await import('./mock/devices')
-    return filterByDateRange(deviceData, filters)
+    return filterBySearchCampaignIds(filterByDateRange(deviceData, filters), allowedCampaignIds)
   }
 
   let query = sb().from('device_performance').select('*')
@@ -1286,7 +1352,7 @@ export async function getDevicePerformance(filters?: Filters): Promise<DevicePer
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toDevice(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toDevice(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getDeviceSummary(filters?: Filters): Promise<DevicePerformance[]> {
@@ -1322,9 +1388,10 @@ export async function getDeviceSummary(filters?: Filters): Promise<DevicePerform
 // ===================================================================
 
 export async function getHourlyPerformance(filters?: Filters): Promise<HourlyPerformance[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { hourlyData } = await import('./mock/hour-of-day')
-    return filterByDateRange(hourlyData, filters)
+    return filterBySearchCampaignIds(filterByDateRange(hourlyData, filters), allowedCampaignIds)
   }
 
   let query = sb().from('hourly_performance').select('*')
@@ -1333,7 +1400,7 @@ export async function getHourlyPerformance(filters?: Filters): Promise<HourlyPer
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toHourly(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toHourly(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getHourlyHeatmapData(
@@ -1376,9 +1443,10 @@ export async function getHourlyHeatmapData(
 // ===================================================================
 
 export async function getAuctionInsights(filters?: Filters): Promise<AuctionInsight[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { auctionInsightData } = await import('./mock/auction-insights')
-    return filterByDateRange(auctionInsightData, filters)
+    return filterBySearchCampaignIds(filterByDateRange(auctionInsightData, filters), allowedCampaignIds)
   }
 
   let query = sb().from('auction_insights').select('*')
@@ -1387,26 +1455,15 @@ export async function getAuctionInsights(filters?: Filters): Promise<AuctionInsi
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toAuctionInsight(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toAuctionInsight(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getAuctionInsightsSummary(): Promise<{
   byCompetitor: { competitor: string; impressionShare: number; overlapRate: number; positionAboveRate: number; topOfPageRate: number; outrankingShare: number }[]
   trend: Record<string, string | number>[]
 }> {
-  if (!isSupabaseConfigured) {
-    const { auctionInsightData } = await import('./mock/auction-insights')
-    return buildAuctionSummary(auctionInsightData)
-  }
-
-  const { data, error } = await sb()
-    .from('auction_insights')
-    .select('*')
-    .limit(50000)
-
-  if (error) throw error
-  const mapped = (data ?? []).map((row) => toAuctionInsight(row as Record<string, unknown>))
-  return buildAuctionSummary(mapped)
+  const filtered = await getAuctionInsights()
+  return buildAuctionSummary(filtered)
 }
 
 function buildAuctionSummary(auctionInsightData: AuctionInsight[]) {
@@ -1463,9 +1520,10 @@ function buildAuctionSummary(auctionInsightData: AuctionInsight[]) {
 // ===================================================================
 
 export async function getConversionActions(filters?: Filters): Promise<ConversionAction[]> {
+  const allowedCampaignIds = await getSearchCampaignIdSet(filters)
   if (!isSupabaseConfigured) {
     const { conversionData } = await import('./mock/conversions')
-    let filtered = filterByDateRange(conversionData, filters)
+    let filtered = filterBySearchCampaignIds(filterByDateRange(conversionData, filters), allowedCampaignIds)
     if (filters?.products?.length) {
       filtered = filtered.filter((c) => filters.products!.includes(c.product))
     }
@@ -1479,7 +1537,7 @@ export async function getConversionActions(filters?: Filters): Promise<Conversio
 
   const { data, error } = await query.limit(50000)
   if (error) throw error
-  return (data ?? []).map((row) => toConversion(row as Record<string, unknown>))
+  return filterBySearchCampaignIds((data ?? []).map((row) => toConversion(row as Record<string, unknown>)), allowedCampaignIds)
 }
 
 export async function getConversionSummary(): Promise<{
@@ -1487,19 +1545,8 @@ export async function getConversionSummary(): Promise<{
   byProduct: { product: Product; conversions: number; value: number }[]
   trend: { date: string; Call: number; Form: number; Quote: number; Chat: number }[]
 }> {
-  if (!isSupabaseConfigured) {
-    const { conversionData } = await import('./mock/conversions')
-    return buildConversionSummary(conversionData)
-  }
-
-  const { data, error } = await sb()
-    .from('conversion_actions')
-    .select('*')
-    .limit(50000)
-
-  if (error) throw error
-  const mapped = (data ?? []).map((row) => toConversion(row as Record<string, unknown>))
-  return buildConversionSummary(mapped)
+  const filtered = await getConversionActions()
+  return buildConversionSummary(filtered)
 }
 
 function buildConversionSummary(conversionData: ConversionAction[]) {
